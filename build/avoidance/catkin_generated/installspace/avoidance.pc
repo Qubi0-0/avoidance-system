@@ -1,0 +1,8 @@
+prefix=/home/qubi/catkin_ws/install
+
+Name: avoidance
+Description: Description of avoidance
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib 
+Requires: rospy std_msgs geometry_msgs

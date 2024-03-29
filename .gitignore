@@ -1,0 +1,26 @@
+# Compiled Python files
+*.pyc
+
+# Compiled C++ files
+*.o
+*.so
+
+# Build directory
+/build/
+
+# Devel directory
+/devel/
+
+# Installation directory
+/install/
+
+# Logs and output files
+*.log
+*.xml
+*.yaml
+
+# IDE/Editor specific files
+.vscode/
+.idea/
+*.sublime-workspace
+*.swp

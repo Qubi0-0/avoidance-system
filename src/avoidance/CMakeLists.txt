@@ -30,7 +30,7 @@ include
 )
 
 
-catkin_install_python(PROGRAMS src/avoidance_mean_node.py  src/depth_mean_node.py src/avoidance_object_node.py  src/depth_object_node.py
+catkin_install_python(PROGRAMS src/avoidance_mean_node.py  src/depth_mean_node.py src/avoidance_object_node.py  src/depth_object_node.py src/point_cloud_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

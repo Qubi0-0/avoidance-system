@@ -181,16 +181,6 @@ class Avoidance:
                     .swapaxes(1, 2)
                     .reshape(-1, nrows, ncols))
 
-    def mean_count(self, mat):
-        dist_mean = [np.mean(sub_m) for sub_m in mat]
-        return dist_mean
-
-    def show_rgb_img(self):
-        for i in range(0,16):
-            self.img = cv.putText(self.img,str(self.mean_mat[i]),np.flip(self.img_spots[i]),cv.FONT_HERSHEY_SIMPLEX,0.6,(0,0,255))
-        cv.imshow("frame",self.img)
-        cv.waitKey(1)
-
     def switch_to_offboard(self):
         if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5.0)):
             if(self.set_mode_client.call(self.offb_set_mode).mode_sent == True):
@@ -301,7 +291,6 @@ class Avoidance:
         return repulsive_force
 
     def spin(self):
-        # self.show_rgb_img()
         mean_mat_up = None
         if self.mean_mat is not None:
             mean_mat_up = self.mean_mat[0:12]

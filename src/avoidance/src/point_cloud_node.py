@@ -10,7 +10,6 @@ from nav_msgs.msg import Odometry
 from cv_bridge import CvBridge
 import tf2_ros
 import numpy as np
-import cv2 as cv
 import math
 import tf 
 import sensor_msgs.point_cloud2 as pc2

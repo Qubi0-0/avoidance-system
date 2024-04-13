@@ -7,7 +7,7 @@ from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeReq
 import mavros_msgs.srv
 from nav_msgs.msg import Odometry
 import math
-import tf 
+from tf import transformations
 
 
 START_ALT = 5 # alt for drone flight
@@ -30,7 +30,7 @@ class PosePointRPY:
         rollRad = math.radians(roll)
         pitchRad = math.radians(pitch)
         yawRad = math.radians(yaw)
-        quaternion = tf.transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
+        quaternion = transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
         self.pos.pose.orientation.x = quaternion[0]
         self.pos.pose.orientation.y = quaternion[1]
         self.pos.pose.orientation.z = quaternion[2]
@@ -73,7 +73,7 @@ class TakeOff:
         self.last_req = rospy.Time.now()
 
     def poseStamped_to_rpy(self, source: PoseStamped):
-        rpy = tf.transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
+        rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
                     source.pose.orientation.z, source.pose.orientation.w])
 
         result = PosePointRPY(source.pose.position.x, source.pose.position.y, source.pose.position.z,
@@ -84,7 +84,7 @@ class TakeOff:
     def set_horizontal_velocity(self, max_velocity):
         rospy.wait_for_service('/mavros/param/set')
         try:
-            self.max_hor_vel(param_id="MPC_XY_VEL_ALL", value=mavros_msgs.msg.ParamValue(real=max_velocity))
+            self.max_hor_vel(param_id="MPC_XY_VEL_ALL", value=mavros_msgs.msg.ParamValue(real=max_velocity)) # type: ignore
         except rospy.ServiceException as e:
             print("Service max_horizontal_velocity (MPC_XY_VEL_MAX) call failed: %s" % e)
 
@@ -93,7 +93,7 @@ class TakeOff:
         self.local_pose.pose.position.y = msg.pose.position.y
         self.local_pose.pose.position.z = msg.pose.position.z
         self.local_pose.pose.orientation = msg.pose.orientation
-        rpy = tf.transformations.euler_from_quaternion([msg.pose.orientation.x,msg.pose.orientation.y,
+        rpy = transformations.euler_from_quaternion([msg.pose.orientation.x,msg.pose.orientation.y,
                     msg.pose.orientation.z,msg.pose.orientation.w])
         self.local_yaw = rpy[2]
 
@@ -101,13 +101,13 @@ class TakeOff:
         self.current_state = msg
 
     def switch_to_offboard(self):
-        if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5.0)):
+        if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
             if(self.set_mode_client.call(self.offb_set_mode).mode_sent == True):
                 rospy.loginfo("OFFBOARD enabled")
             
             self.last_req = rospy.Time.now()
         else:
-            if(not self.current_state.armed and (rospy.Time.now() - self.last_req) > rospy.Duration(5.0)):
+            if(not self.current_state.armed and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
                 if(self.arming_client.call(self.arm_cmd).success == True):
                     rospy.loginfo("Vehicle armed")
             
@@ -135,7 +135,7 @@ class TakeOff:
         rollRad = 0 
         pitchRad = 0 
         yawRad = math.radians(240)
-        quaternion = tf.transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
+        quaternion = transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
         start_pose.pose.orientation.x = quaternion[0]
         start_pose.pose.orientation.y = quaternion[1]
         start_pose.pose.orientation.z = quaternion[2]
@@ -151,15 +151,15 @@ class TakeOff:
             return False
 
         curr_orient = self.local_pose.pose.orientation
-        curr_euler = tf.transformations.euler_from_quaternion(
+        curr_euler = transformations.euler_from_quaternion(
             [curr_orient.x, curr_orient.y, curr_orient.z, curr_orient.w])
         cr = abs(curr_euler[0] - math.radians(goal.roll)) < TARGET_ANGL
         cp = abs(curr_euler[1] - math.radians(goal.pitch)) < TARGET_ANGL
         cy = abs(curr_euler[2] - math.radians(goal.yaw)) < TARGET_ANGL
         
         in_range = cr and cp and cy
-        if in_range:
-            rospy.loginfo(f"Desired Position Reached X:{self.fixed_positions[self.state].pos.pose.position.x} Y:{self.fixed_positions[self.state].pos.pose.position.y}")
+        # if in_range:
+            # rospy.loginfo(f"Desired Position Reached X:{self.fixed_positions[self.state].pos.pose.position.x} Y:{self.fixed_positions[self.state].pos.pose.position.y}")
         return in_range 
 
 

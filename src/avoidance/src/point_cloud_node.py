@@ -75,11 +75,7 @@ class Avoidance:
             '/iris/camera/depth/points', pc2.PointCloud2, self.cloud_callback, queue_size=1)
 
         self.state_sub = rospy.Subscriber("mavros/state", State, callback=self.state_callback)
-
-        self.img_spots = [[60,80], [60,240], [60,400], [60,560],
-                          [180,80],[180,240],[180,400],[180,560],
-                          [300,80],[300,240],[300,400],[300,560],
-                          [420,80],[420,240],[420,400],[420,560]]
+        
         fixed_yaw = 180
         dist_factor = -10
         self.avoid_position = PosePointRPY(1, 0, START_ALT,  0, 0, fixed_yaw)

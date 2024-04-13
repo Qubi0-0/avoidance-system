@@ -13,7 +13,10 @@ import numpy as np
 import math
 from tf import transformations
 import sensor_msgs.point_cloud2 as pc2
-
+from sklearn.cluster import DBSCAN
+import matplotlib.pyplot as plt 
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.cm as cm
 
 START_ALT = 5 # alt for drone flight
 M_PI = 3.14159265359
@@ -121,6 +124,7 @@ class Avoidance:
         self.drone_position = np.array([self.local_pose.pose.position.x,
                                 self.local_pose.pose.position.y,
                                 self.local_pose.pose.position.z])
+        self.clusters = None
 
     def poseStamped_to_rpy(self, source: PoseStamped):
         rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
@@ -163,6 +167,28 @@ class Avoidance:
     def cloud_callback(self, cloud_msg):
         cloud_points = list(pc2.read_points(cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
         self.obstacles = np.array(cloud_points)
+
+        # Group the points
+        self.clusters = self.group_points(self.obstacles)
+
+    
+    def group_points(self, cloud_points, eps=0.5, min_samples=5):
+        # Apply DBSCAN to cloud_points
+        db = DBSCAN(eps=eps, min_samples=min_samples).fit(cloud_points)
+
+        # Get the labels of the clusters
+        labels = db.labels_
+
+        # Convert labels to a list
+        labels_list = labels.tolist()
+
+        # Number of clusters in labels, ignoring noise if present.
+        n_clusters = len(set(labels_list)) - (1 if -1 in labels_list else 0)
+
+        # Create a dictionary to hold the points in each cluster
+        clusters = {i: cloud_points[labels == i] for i in range(n_clusters)}
+
+        return clusters
 
     def compute_repulsive_force(self):
         repulsive_force = np.zeros(3)

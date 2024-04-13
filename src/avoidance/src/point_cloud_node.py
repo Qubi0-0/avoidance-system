@@ -56,9 +56,6 @@ class Avoidance:
         self.pub_vel = rospy.Publisher(
             "/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
 
-        # self.sub_roi = rospy.Subscriber(
-        #     '/iris/camera/depth/image_raw', Image, self.depth_callback, queue_size=1)
-
         self.sub_img = rospy.Subscriber(
             '/iris/camera/rgb/image_raw', Image, self.img_callback, queue_size=1)
         
@@ -147,12 +144,6 @@ class Avoidance:
         rpy = transformations.euler_from_quaternion([msg.pose.orientation.x,msg.pose.orientation.y,
                     msg.pose.orientation.z,msg.pose.orientation.w])
         self.local_yaw = rpy[2]
-
-    # def depth_callback(self, msg: Image):
-    #     last_depth = self.bridge.imgmsg_to_cv2(
-    #         msg, desired_encoding='32FC1').copy()
-    #     mat = self.split(last_depth, 160, 120)
-    #     self.mean_mat = self.mean_count(mat) 
 
     def state_callback(self, msg):
         self.current_state = msg

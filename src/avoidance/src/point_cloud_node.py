@@ -14,9 +14,6 @@ import math
 from tf import transformations
 import sensor_msgs.point_cloud2 as pc2
 from sklearn.cluster import DBSCAN
-import matplotlib.pyplot as plt 
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.cm as cm
 
 START_ALT = 5 # alt for drone flight
 M_PI = 3.14159265359

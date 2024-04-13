@@ -24,8 +24,8 @@ TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.1
 DEPTH_TRESHOLD = 5   # threshold for depth camera in meters
 HEIGHT_TRESHOLD = 1
-K_ATT = 0.5  # Attractive force constant
-K_REP = 1.0  # Repulsive force constant
+K_ATT = 0.005  # Attractive force constant
+K_REP = 0.01  # Repulsive force constant
 
 class PosePointRPY:
     def __init__(self, x, y, z, roll, pitch, yaw):
@@ -124,7 +124,7 @@ class Avoidance:
         self.drone_position = np.array([self.local_pose.pose.position.x,
                                 self.local_pose.pose.position.y,
                                 self.local_pose.pose.position.z])
-        self.clusters = None
+        self.clusters = []
 
     def poseStamped_to_rpy(self, source: PoseStamped):
         rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
@@ -189,19 +189,6 @@ class Avoidance:
         clusters = {i: cloud_points[labels == i] for i in range(n_clusters)}
 
         return clusters
-
-    def compute_repulsive_force(self):
-        repulsive_force = np.zeros(3)
-
-        for obstacle in self.obstacles:
-            # Compute the distance between the drone and the obstacle
-            distance = np.linalg.norm(self.drone_position - obstacle)
-
-            # Compute the direction vector away from the obstacle
-            direction_vector = (self.drone_position - obstacle) / distance
-
-            # Compute repulsive force using the inverse square law
-            repulsive_force += (self.K_REP / distance**2) * direction_vector
 
     def switch_to_offboard(self):
         if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
@@ -275,44 +262,51 @@ class Avoidance:
             self.state = 1
 
     def potential_fields_avoidance(self):
+        vector = Vector3Stamped()
+
         attractive_force = self.compute_attractive_force()
         repulsive_force = self.compute_repulsive_force()
 
         total_force = attractive_force + repulsive_force
 
         # Update the velocity based on the computed force
-        self.vel.linear.x = total_force[0]
-        self.vel.linear.y = total_force[1]
-        self.vel.linear.z = total_force[2]
+        vector.vector.x = total_force[0]
+        vector.vector.y = total_force[1]
+        vector.vector.z = total_force[2]
 
-        self.pub_vel.publish(self.vel)
+        rospy.loginfo("Publishing Vector")
+        self.pub_accel.publish(vector) # Publish vector
+
+    def compute_repulsive_force(self):
+        repulsive_force = np.zeros(3)
+
+        if not self.clusters:
+            for obstacle in self.clusters:
+                # Compute the distance between the drone and the obstacle
+                distance = np.linalg.norm(self.drone_position - obstacle)
+
+                # Compute the direction vector away from the obstacle
+                direction_vector = (self.drone_position - obstacle) / distance
+
+                # Compute repulsive force using the inverse square law
+                repulsive_force += (self.K_REP / distance**2) * direction_vector
+
+        return repulsive_force
 
     def compute_attractive_force(self):
-        goal_pos = np.array([self.fixed_positions[self.state].pos.pose.position.x,
-                             self.fixed_positions[self.state].pos.pose.position.y,
-                             self.fixed_positions[self.state].pos.pose.position.z])
+        goal_pos = np.array([self.fixed_positions[-1].pos.pose.position.x,
+                             self.fixed_positions[-1].pos.pose.position.y,
+                             self.fixed_positions[-1].pos.pose.position.z])
         current_pos = np.array([self.local_pose.pose.position.x,
                                 self.local_pose.pose.position.y,
                                 self.local_pose.pose.position.z])
 
         attractive_force = K_ATT * (goal_pos - current_pos)
         return attractive_force
-
-    def publish_vector(self):
-        vector = Vector3Stamped()
-
-        # Set the vector values
-        vector.vector.x = 1
-        vector.vector.y = 0
-        vector.vector.z = 0
-
-        # Publish the vector
-        rospy.loginfo("Publishing Vector")
-        self.pub_accel.publish(vector)
-
+    
     def spin(self):
-        self.publish_vector()
-
+        # self.publish_vector()
+        self.potential_fields_avoidance()
             # self.potential_fields_avoidance()
             # self.publish_pose(self.fixed_positions[self.state])
 

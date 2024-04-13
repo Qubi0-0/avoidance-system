@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from re import A
 import rospy
-from geometry_msgs.msg import PoseStamped, Twist
+from geometry_msgs.msg import PoseStamped, Twist, Vector3Stamped
 from mavros_msgs.msg import State
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest
 from sensor_msgs.msg import Image
@@ -11,7 +11,7 @@ from cv_bridge import CvBridge
 import tf2_ros
 import numpy as np
 import math
-import tf 
+from tf import transformations
 import sensor_msgs.point_cloud2 as pc2
 
 
@@ -20,7 +20,7 @@ M_PI = 3.14159265359
 TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.1
 DEPTH_TRESHOLD = 5   # threshold for depth camera in meters
-HEIGHT_TRESHOLD = 0.2
+HEIGHT_TRESHOLD = 1
 K_ATT = 0.5  # Attractive force constant
 K_REP = 1.0  # Repulsive force constant
 
@@ -38,7 +38,7 @@ class PosePointRPY:
         rollRad = math.radians(roll)
         pitchRad = math.radians(pitch)
         yawRad = math.radians(yaw)
-        quaternion = tf.transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
+        quaternion = transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
         self.pos.pose.orientation.x = quaternion[0]
         self.pos.pose.orientation.y = quaternion[1]
         self.pos.pose.orientation.z = quaternion[2]
@@ -56,14 +56,17 @@ class Avoidance:
         self.pub_vel = rospy.Publisher(
             "/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
 
-        self.sub_roi = rospy.Subscriber(
-            '/iris/camera/depth/image_raw', Image, self.depth_callback, queue_size=1)
+        # self.sub_roi = rospy.Subscriber(
+        #     '/iris/camera/depth/image_raw', Image, self.depth_callback, queue_size=1)
 
         self.sub_img = rospy.Subscriber(
             '/iris/camera/rgb/image_raw', Image, self.img_callback, queue_size=1)
         
         self.max_hor_vel = rospy.ServiceProxy(
             '/mavros/param/set', mavros_msgs.srv.ParamSet)
+        
+        self.pub_accel = rospy.Publisher(
+            "/mavros/setpoint_accel/accel", Vector3Stamped, queue_size=1)
 
         rospy.wait_for_service("/mavros/cmd/arming")
         self.arming_client = rospy.ServiceProxy("mavros/cmd/arming", CommandBool)    
@@ -120,7 +123,7 @@ class Avoidance:
                                 self.local_pose.pose.position.z])
 
     def poseStamped_to_rpy(self, source: PoseStamped):
-        rpy = tf.transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
+        rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
                     source.pose.orientation.z, source.pose.orientation.w])
 
         result = PosePointRPY(source.pose.position.x, source.pose.position.y, source.pose.position.z,
@@ -131,7 +134,7 @@ class Avoidance:
     def set_horizontal_velocity(self, max_velocity):
         rospy.wait_for_service('/mavros/param/set')
         try:
-            self.max_hor_vel(param_id="MPC_XY_VEL_ALL", value=mavros_msgs.msg.ParamValue(real=max_velocity))
+            self.max_hor_vel(param_id="MPC_XY_VEL_ALL", value=mavros_msgs.msg.ParamValue(real=max_velocity)) # type: ignore
         except rospy.ServiceException as e:
             print("Service max_horizontal_velocity (MPC_XY_VEL_MAX) call failed: %s" % e)
 
@@ -140,15 +143,15 @@ class Avoidance:
         self.local_pose.pose.position.y = msg.pose.position.y
         self.local_pose.pose.position.z = msg.pose.position.z
         self.local_pose.pose.orientation = msg.pose.orientation
-        rpy = tf.transformations.euler_from_quaternion([msg.pose.orientation.x,msg.pose.orientation.y,
+        rpy = transformations.euler_from_quaternion([msg.pose.orientation.x,msg.pose.orientation.y,
                     msg.pose.orientation.z,msg.pose.orientation.w])
         self.local_yaw = rpy[2]
 
-    def depth_callback(self, msg: Image):
-        last_depth = self.bridge.imgmsg_to_cv2(
-            msg, desired_encoding='32FC1').copy()
-        mat = self.split(last_depth, 160, 120)
-        self.mean_mat = self.mean_count(mat) 
+    # def depth_callback(self, msg: Image):
+    #     last_depth = self.bridge.imgmsg_to_cv2(
+    #         msg, desired_encoding='32FC1').copy()
+    #     mat = self.split(last_depth, 160, 120)
+    #     self.mean_mat = self.mean_count(mat) 
 
     def state_callback(self, msg):
         self.current_state = msg
@@ -174,20 +177,14 @@ class Avoidance:
             # Compute repulsive force using the inverse square law
             repulsive_force += (self.K_REP / distance**2) * direction_vector
 
-    def split(self, array, nrows, ncols):
-        r, h = array.shape
-        return (array.reshape(h//nrows, nrows, -1, ncols)
-                    .swapaxes(1, 2)
-                    .reshape(-1, nrows, ncols))
-
     def switch_to_offboard(self):
-        if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5.0)):
+        if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
             if(self.set_mode_client.call(self.offb_set_mode).mode_sent == True):
                 rospy.loginfo("OFFBOARD enabled")
             
             self.last_req = rospy.Time.now()
         else:
-            if(not self.current_state.armed and (rospy.Time.now() - self.last_req) > rospy.Duration(5.0)):
+            if(not self.current_state.armed and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
                 if(self.arming_client.call(self.arm_cmd).success == True):
                     rospy.loginfo("Vehicle armed")
             
@@ -215,7 +212,7 @@ class Avoidance:
         rollRad = 0 
         pitchRad = 0 
         yawRad = math.radians(240)
-        quaternion = tf.transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
+        quaternion = transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
         start_pose.pose.orientation.x = quaternion[0]
         start_pose.pose.orientation.y = quaternion[1]
         start_pose.pose.orientation.z = quaternion[2]
@@ -231,7 +228,7 @@ class Avoidance:
             return False
 
         curr_orient = self.local_pose.pose.orientation
-        curr_euler = tf.transformations.euler_from_quaternion(
+        curr_euler = transformations.euler_from_quaternion(
             [curr_orient.x, curr_orient.y, curr_orient.z, curr_orient.w])
         cr = abs(curr_euler[0] - math.radians(goal.roll)) < TARGET_ANGL
         cp = abs(curr_euler[1] - math.radians(goal.pitch)) < TARGET_ANGL
@@ -275,37 +272,23 @@ class Avoidance:
         attractive_force = K_ATT * (goal_pos - current_pos)
         return attractive_force
 
-    def compute_repulsive_force(self):
-        repulsive_force = np.zeros(3)
+    def publish_vector(self):
+        vector = Vector3Stamped()
 
-        for i in range(len(self.mean_mat)):
-            if self.mean_mat[i] < DEPTH_TRESHOLD:
-                obstacle_pos = self.compute_obstacle_position(i)
-                current_pos = np.array([self.local_pose.pose.position.x,
-                                        self.local_pose.pose.position.y,
-                                        self.local_pose.pose.position.z])
+        # Set the vector values
+        vector.vector.x = 1
+        vector.vector.y = 0
+        vector.vector.z = 0
 
-                repulsive_force += K_REP / np.linalg.norm(obstacle_pos - current_pos)**3 * (current_pos - obstacle_pos)
-
-        return repulsive_force
+        # Publish the vector
+        rospy.loginfo("Publishing Vector")
+        self.pub_accel.publish(vector)
 
     def spin(self):
-        mean_mat_up = None
-        if self.mean_mat is not None:
-            mean_mat_up = self.mean_mat[0:12]
-        
-        if not any(sub_mat < DEPTH_TRESHOLD for sub_mat in mean_mat_up):
-            if self.position_check(self.fixed_positions[self.state]):
-                self.updateState()
-            self.publish_pose(self.fixed_positions[self.state])
-        else:
-            # Calculate the current position of the drone
-            self.drone_position = np.array([self.local_pose.pose.position.x,
-                                            self.local_pose.pose.position.y,
-                                            self.local_pose.pose.position.z])
+        self.publish_vector()
 
-            self.potential_fields_avoidance()
-            self.publish_pose(self.fixed_positions[self.state])
+            # self.potential_fields_avoidance()
+            # self.publish_pose(self.fixed_positions[self.state])
 
 
 if __name__ == '__main__':

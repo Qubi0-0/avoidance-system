@@ -56,8 +56,8 @@ class Avoidance:
         self.pub_vel = rospy.Publisher(
             "/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
 
-        self.sub_img = rospy.Subscriber(
-            '/iris/camera/rgb/image_raw', Image, self.img_callback, queue_size=1)
+        # self.sub_img = rospy.Subscriber(
+        #     '/iris/camera/rgb/image_raw', Image, self.img_callback, queue_size=1)
         
         self.max_hor_vel = rospy.ServiceProxy(
             '/mavros/param/set', mavros_msgs.srv.ParamSet)
@@ -110,9 +110,11 @@ class Avoidance:
         self.bridge = CvBridge()
         self.mean_mat = None
         self.drone_position = np.array([self.local_pose.pose.position.x,
-                                self.local_pose.pose.position.y,
-                                self.local_pose.pose.position.z])
+                                        self.local_pose.pose.position.y,
+                                        self.local_pose.pose.position.z])
         self.clusters = []
+        self.last_published = rospy.Time.now()
+
 
     def poseStamped_to_rpy(self, source: PoseStamped):
         rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
@@ -142,9 +144,9 @@ class Avoidance:
     def state_callback(self, msg):
         self.current_state = msg
 
-    def img_callback(self, msg: Image):
-        self.img = self.bridge.imgmsg_to_cv2(
-            msg, desired_encoding='bgra8').copy()
+    # def img_callback(self, msg: Image):
+    #     self.img = self.bridge.imgmsg_to_cv2(
+    #         msg, desired_encoding='bgra8').copy()
         
     def cloud_callback(self, cloud_msg):
         cloud_points = list(pc2.read_points(cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
@@ -167,8 +169,8 @@ class Avoidance:
         # Number of clusters in labels, ignoring noise if present.
         n_clusters = len(set(labels_list)) - (1 if -1 in labels_list else 0)
 
-        # Create a dictionary to hold the points in each cluster
-        clusters = {i: cloud_points[labels == i] for i in range(n_clusters)}
+        # Create a list to hold the centroid and dispersion of each cluster
+        clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
 
         return clusters
 
@@ -243,35 +245,19 @@ class Avoidance:
         else:
             self.state = 1
 
-    def potential_fields_avoidance(self):
-        vector = Vector3Stamped()
-
-        attractive_force = self.compute_attractive_force()
-        repulsive_force = self.compute_repulsive_force()
-
-        total_force = attractive_force + repulsive_force
-
-        # Update the velocity based on the computed force
-        vector.vector.x = total_force[0]
-        vector.vector.y = total_force[1]
-        vector.vector.z = total_force[2]
-
-        rospy.loginfo("Publishing Vector")
-        self.pub_accel.publish(vector) # Publish vector
-
     def compute_repulsive_force(self):
         repulsive_force = np.zeros(3)
 
-        if not self.clusters:
-            for obstacle in self.clusters:
+        if self.clusters:
+            for obstacle, std_dev in self.clusters:
                 # Compute the distance between the drone and the obstacle
                 distance = np.linalg.norm(self.drone_position - obstacle)
 
                 # Compute the direction vector away from the obstacle
                 direction_vector = (self.drone_position - obstacle) / distance
 
-                # Compute repulsive force using the inverse square law
-                repulsive_force += (K_REP / distance**2) * direction_vector
+                # Compute repulsive force using the inverse square law, adjusted by the standard deviation
+                repulsive_force += ((K_REP / distance**2) * (1 + std_dev)) * direction_vector
 
         return repulsive_force
 
@@ -285,7 +271,25 @@ class Avoidance:
 
         attractive_force = K_ATT * (goal_pos - current_pos)
         return attractive_force
-    
+
+    def potential_fields_avoidance(self):
+        vector = Vector3Stamped()
+
+        attractive_force = self.compute_attractive_force()
+        repulsive_force = self.compute_repulsive_force()
+
+        total_force = attractive_force + repulsive_force
+
+        # Update the velocity based on the computed force
+        vector.vector.x = total_force[0]
+        vector.vector.y = total_force[1]
+        vector.vector.z = total_force[2]
+
+        rospy.loginfo(f"Atractive: {attractive_force} \n Repulsive: {repulsive_force} \n At time: {rospy.Time.now()} ")
+        if rospy.Time.now() - self.last_published > rospy.Duration(0, int(5E8)):
+            self.pub_accel.publish(vector) # Publish vector
+            self.last_published = rospy.Time.now()  # Update the time of the last publish
+
     def spin(self):
         # self.publish_vector()
         self.potential_fields_avoidance()

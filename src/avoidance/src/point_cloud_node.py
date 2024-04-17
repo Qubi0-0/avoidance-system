@@ -109,8 +109,6 @@ class Avoidance:
         self.last_req = rospy.Time.now()
         self.bridge = CvBridge()
         self.mean_mat = None
-        self.K_ATT = 0.5  # Attractive force coefficient
-        self.K_REP = 1.0  # Repulsive force coefficient
         self.drone_position = np.array([self.local_pose.pose.position.x,
                                 self.local_pose.pose.position.y,
                                 self.local_pose.pose.position.z])
@@ -273,7 +271,7 @@ class Avoidance:
                 direction_vector = (self.drone_position - obstacle) / distance
 
                 # Compute repulsive force using the inverse square law
-                repulsive_force += (self.K_REP / distance**2) * direction_vector
+                repulsive_force += (K_REP / distance**2) * direction_vector
 
         return repulsive_force
 

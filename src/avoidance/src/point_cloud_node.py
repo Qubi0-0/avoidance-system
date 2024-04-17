@@ -14,15 +14,17 @@ import math
 from tf import transformations
 import sensor_msgs.point_cloud2 as pc2
 from sklearn.cluster import DBSCAN
+from sklearn.cluster import MeanShift
 
-START_ALT = 5 # alt for drone flight
+
+START_ALT = 10 # alt for drone flight
 M_PI = 3.14159265359
 TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.1
 DEPTH_TRESHOLD = 5   # threshold for depth camera in meters
 HEIGHT_TRESHOLD = 1
-K_ATT = 0.005  # Attractive force constant
-K_REP = 0.01  # Repulsive force constant
+K_ATT = 0.01  # Attractive force constant
+K_REP = 0.005  # Repulsive force constant
 
 class PosePointRPY:
     def __init__(self, x, y, z, roll, pitch, yaw):
@@ -114,7 +116,7 @@ class Avoidance:
                                         self.local_pose.pose.position.z])
         self.clusters = []
         self.last_published = rospy.Time.now()
-
+        self.yaw_angle = 0.0
 
     def poseStamped_to_rpy(self, source: PoseStamped):
         rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
@@ -156,7 +158,10 @@ class Avoidance:
         self.clusters = self.group_points(self.obstacles)
 
     
-    def group_points(self, cloud_points, eps=0.5, min_samples=5):
+    def group_points(self, cloud_points, eps=0.5, min_samples=30):
+        # Apply a pre-processing step to reduce the number of points
+        cloud_points = cloud_points[::10]  # Take every 10th point
+
         # Apply DBSCAN to cloud_points
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(cloud_points)
 
@@ -171,8 +176,31 @@ class Avoidance:
 
         # Create a list to hold the centroid and dispersion of each cluster
         clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
-
+        
         return clusters
+
+
+    # def group_points(self, cloud_points, bandwidth=0.5):
+    #     # Apply a pre-processing step to reduce the number of points
+    #     # cloud_points = cloud_points[::10]  # Take every 10th point
+
+    #     # Apply MeanShift to cloud_points
+    #     ms = MeanShift(bandwidth=bandwidth).fit(cloud_points)
+
+    #     # Get the labels of the clusters
+    #     labels = ms.labels_
+
+    #     # Convert labels to a list
+    #     labels_list = labels.tolist()
+
+    #     # Number of clusters in labels, ignoring noise if present.
+    #     n_clusters = len(set(labels_list)) - (1 if -1 in labels_list else 0)
+
+    #     # Create a list to hold the centroid and dispersion of each cluster
+    #     clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
+    #     rospy.loginfo(f"Number of Clusters : {clusters.__len__()}")
+        
+    #     return clusters
 
     def switch_to_offboard(self):
         if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
@@ -200,16 +228,14 @@ class Avoidance:
         self.pub_pose.publish(pose)
 
     def publish_takeoff_point(self):
-        self.set_horizontal_velocity(2)
+        # self.set_horizontal_velocity(2)
 
         start_pose =  PoseStamped()
         start_pose.pose.position.x = self.local_pose.pose.position.x
         start_pose.pose.position.y = self.local_pose.pose.position.x
         start_pose.pose.position.z = START_ALT
-        rollRad = 0 
-        pitchRad = 0 
-        yawRad = math.radians(240)
-        quaternion = transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
+
+        quaternion = transformations.quaternion_from_euler(0, 0, self.yaw_angle)
         start_pose.pose.orientation.x = quaternion[0]
         start_pose.pose.orientation.y = quaternion[1]
         start_pose.pose.orientation.z = quaternion[2]
@@ -272,6 +298,8 @@ class Avoidance:
         attractive_force = K_ATT * (goal_pos - current_pos)
         return attractive_force
 
+    import math
+
     def potential_fields_avoidance(self):
         vector = Vector3Stamped()
 
@@ -285,16 +313,16 @@ class Avoidance:
         vector.vector.y = total_force[1]
         vector.vector.z = total_force[2]
 
-        rospy.loginfo(f"Atractive: {attractive_force} \n Repulsive: {repulsive_force} \n At time: {rospy.Time.now()} ")
-        if rospy.Time.now() - self.last_published > rospy.Duration(0, int(5E8)):
+        # Compute the yaw angle
+        self.yaw_angle = math.atan2(total_force[1], total_force[0])
+
+        rospy.loginfo(f"Atractive: {attractive_force} \n Repulsive: {repulsive_force}")
+        if rospy.Time.now() - self.last_published > rospy.Duration(0, 100000000):
             self.pub_accel.publish(vector) # Publish vector
             self.last_published = rospy.Time.now()  # Update the time of the last publish
 
     def spin(self):
-        # self.publish_vector()
         self.potential_fields_avoidance()
-            # self.potential_fields_avoidance()
-            # self.publish_pose(self.fixed_positions[self.state])
 
 
 if __name__ == '__main__':

@@ -15,9 +15,10 @@ from tf import transformations
 import sensor_msgs.point_cloud2 as pc2
 from sklearn.cluster import DBSCAN
 from sklearn.cluster import MeanShift
+from enum import Enum
 
 
-START_ALT = 10 # alt for drone flight
+START_ALT = 5 # alt for drone flight
 M_PI = 3.14159265359
 TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.1
@@ -45,9 +46,14 @@ class PosePointRPY:
         self.pos.pose.orientation.y = quaternion[1]
         self.pos.pose.orientation.z = quaternion[2]
         self.pos.pose.orientation.w = quaternion[3]
-
+   
+class Status(Enum):
+    Takeoff = 0
+    FlyMode = 1
 
 class Avoidance:
+
+
     def __init__(self):
         self.pose = rospy.Subscriber(
             "/mavros/local_position/pose", PoseStamped, self.positionCallback)
@@ -179,7 +185,6 @@ class Avoidance:
         
         return clusters
 
-
     # def group_points(self, cloud_points, bandwidth=0.5):
     #     # Apply a pre-processing step to reduce the number of points
     #     # cloud_points = cloud_points[::10]  # Take every 10th point
@@ -308,6 +313,10 @@ class Avoidance:
 
         total_force = attractive_force + repulsive_force
 
+        # Ensure the drone does not lower its height
+        if total_force[2] < 0 and self.local_pose.pose.position.z < START_ALT:
+            total_force[2] = 0
+
         # Update the velocity based on the computed force
         vector.vector.x = total_force[0]
         vector.vector.y = total_force[1]
@@ -320,7 +329,6 @@ class Avoidance:
         if rospy.Time.now() - self.last_published > rospy.Duration(0, 100000000):
             self.pub_accel.publish(vector) # Publish vector
             self.last_published = rospy.Time.now()  # Update the time of the last publish
-
     def spin(self):
         self.potential_fields_avoidance()
 
@@ -329,7 +337,9 @@ if __name__ == '__main__':
     rospy.init_node('avoidance_node') 
     avoider = Avoidance()
     rospy.loginfo("Avoidance node initiated")
+    current_status = Status.Takeoff
 
+    
     while(not rospy.is_shutdown() and not avoider.current_state.connected):
         avoider.rate.sleep()
 
@@ -346,8 +356,12 @@ if __name__ == '__main__':
     rospy.loginfo("Preparing to takeoff")
     while(not rospy.is_shutdown()):
         avoider.switch_to_offboard()
-
-        if avoider.local_pose.pose.position.z > START_ALT - HEIGHT_TRESHOLD and avoider.local_pose.pose.position.z < START_ALT + HEIGHT_TRESHOLD:
+    
+        if current_status == Status.FlyMode:
             avoider.spin()
+        elif (avoider.local_pose.pose.position.z > START_ALT - HEIGHT_TRESHOLD) and current_status == Status.Takeoff:
+            current_status = Status.FlyMode          
+            rospy.loginfo("STATUS Change to FlyMode")
+            
         else:
             avoider.publish_takeoff_point()

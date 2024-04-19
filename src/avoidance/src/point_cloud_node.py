@@ -119,7 +119,8 @@ class Avoidance:
                                         self.local_pose.pose.position.z])
         self.clusters = []
         self.last_published = rospy.Time.now()
-        self.yaw_angle = 0.0
+        self.flight_status = Status.Takeoff
+        self.yaw_angle = 180
 
     def poseStamped_to_rpy(self, source: PoseStamped):
         rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
@@ -177,28 +178,6 @@ class Avoidance:
         
         return clusters
 
-    # def group_points(self, cloud_points, bandwidth=0.5):
-    #     # Apply a pre-processing step to reduce the number of points
-    #     # cloud_points = cloud_points[::10]  # Take every 10th point
-
-    #     # Apply MeanShift to cloud_points
-    #     ms = MeanShift(bandwidth=bandwidth).fit(cloud_points)
-
-    #     # Get the labels of the clusters
-    #     labels = ms.labels_
-
-    #     # Convert labels to a list
-    #     labels_list = labels.tolist()
-
-    #     # Number of clusters in labels, ignoring noise if present.
-    #     n_clusters = len(set(labels_list)) - (1 if -1 in labels_list else 0)
-
-    #     # Create a list to hold the centroid and dispersion of each cluster
-    #     clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
-    #     rospy.loginfo(f"Number of Clusters : {clusters.__len__()}")
-        
-    #     return clusters
-
     def switch_to_offboard(self):
         if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
             if(self.set_mode_client.call(self.offb_set_mode).mode_sent == True):
@@ -226,12 +205,12 @@ class Avoidance:
 
     def publish_takeoff_point(self):
         # self.set_horizontal_velocity(2)
-
+        self.flight_status = Status.Takeoff
         start_pose =  PoseStamped()
         start_pose.pose.position.x = self.local_pose.pose.position.x
         start_pose.pose.position.y = self.local_pose.pose.position.x
         start_pose.pose.position.z = FLIGHT_ALT
-
+        
         quaternion = transformations.quaternion_from_euler(0, 0, self.yaw_angle)
         start_pose.pose.orientation.x = quaternion[0]
         start_pose.pose.orientation.y = quaternion[1]
@@ -302,17 +281,19 @@ class Avoidance:
         repulsive_force = self.compute_repulsive_force()
 
         total_force = attractive_force + repulsive_force
+        self.yaw_angle = math.atan2(attractive_force[1], attractive_force[0]) #  + math.pi
 
-        if total_force[2] < 0 and self.local_pose.pose.position.z < FLIGHT_ALT:
+        if self.local_pose.pose.position.z < FLIGHT_ALT:
+            total_force[2] = 1
+        elif total_force[2] < 0 and self.local_pose.pose.position.z < FLIGHT_ALT:
             total_force[2] = 0
 
         vector.vector.x = total_force[0]
         vector.vector.y = total_force[1]
         vector.vector.z = total_force[2]
 
-        self.yaw_angle = math.atan2(total_force[1], total_force[0])
 
-        rospy.loginfo(f"Atractive: {attractive_force} \n Repulsive: {repulsive_force}")
+        # rospy.loginfo(f"\n Atractive: \n x: {attractive_force[0]}, y: {attractive_force[1]}, z: {attractive_force[2]} \n Repulsive:\n x: {repulsive_force[0]}, y: {repulsive_force[1]}, z: {repulsive_force[2]}")
         if rospy.Time.now() - self.last_published > rospy.Duration(0, 100000000):
             self.pub_accel.publish(vector)
             self.last_published = rospy.Time.now()
@@ -324,7 +305,6 @@ if __name__ == '__main__':
     rospy.init_node('avoidance_node') 
     avoider = Avoidance()
     rospy.loginfo("Avoidance node initiated")
-    current_status = Status.Takeoff
 
     
     while(not rospy.is_shutdown() and not avoider.current_state.connected):
@@ -344,10 +324,10 @@ if __name__ == '__main__':
     while(not rospy.is_shutdown()):
         avoider.switch_to_offboard()
     
-        if current_status == Status.FlyMode:
+        if avoider.flight_status == Status.FlyMode:
             avoider.spin()
-        elif (avoider.local_pose.pose.position.z > FLIGHT_ALT - HEIGHT_TRESHOLD) and current_status == Status.Takeoff:
-            current_status = Status.FlyMode          
+        elif (avoider.local_pose.pose.position.z > FLIGHT_ALT - HEIGHT_TRESHOLD) and avoider.flight_status == Status.Takeoff:
+            avoider.flight_status = Status.FlyMode          
             rospy.loginfo("STATUS Change to FlyMode")
             
         else:

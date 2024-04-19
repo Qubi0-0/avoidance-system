@@ -18,7 +18,7 @@ from sklearn.cluster import MeanShift
 from enum import Enum
 
 
-START_ALT = 5 # alt for drone flight
+FLIGHT_ALT = 5 # alt for drone flight
 M_PI = 3.14159265359
 TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.1
@@ -83,21 +83,21 @@ class Avoidance:
         
         fixed_yaw = 180
         dist_factor = -10
-        self.avoid_position = PosePointRPY(1, 0, START_ALT,  0, 0, fixed_yaw)
+        self.avoid_position = PosePointRPY(1, 0, FLIGHT_ALT,  0, 0, fixed_yaw)
         self.fixed_positions = [
-            PosePointRPY(dist_factor*0, 0, START_ALT, 0, 0, fixed_yaw),
-            PosePointRPY(dist_factor*1, 0, START_ALT, 0, 0, fixed_yaw),  
-            PosePointRPY(dist_factor*2, 0, START_ALT, 0, 0, fixed_yaw), 
-            PosePointRPY(dist_factor*3, 0, START_ALT, 0, 0, fixed_yaw), 
-            PosePointRPY(dist_factor*4, 0, START_ALT, 0, 0, fixed_yaw), 
-            PosePointRPY(dist_factor*5, 0, START_ALT, 0, 0, fixed_yaw),  
-            PosePointRPY(dist_factor*6, 0, START_ALT, 0, 0, fixed_yaw), 
-            PosePointRPY(dist_factor*7, 0, START_ALT, 0, 0, fixed_yaw),  
-            PosePointRPY(dist_factor*8, 0, START_ALT, 0, 0, fixed_yaw),  
-            PosePointRPY(dist_factor*9, 0, START_ALT, 0, 0, fixed_yaw),  
-            PosePointRPY(dist_factor*10, 0, START_ALT, 0, 0, fixed_yaw),  
-            PosePointRPY(dist_factor*11, 0, START_ALT, 0, 0, fixed_yaw),
-            PosePointRPY(dist_factor*12, 0, START_ALT, 0, 0, fixed_yaw)
+            PosePointRPY(dist_factor*0, 0, FLIGHT_ALT, 0, 0, fixed_yaw),
+            PosePointRPY(dist_factor*1, 0, FLIGHT_ALT, 0, 0, fixed_yaw),  
+            PosePointRPY(dist_factor*2, 0, FLIGHT_ALT, 0, 0, fixed_yaw), 
+            PosePointRPY(dist_factor*3, 0, FLIGHT_ALT, 0, 0, fixed_yaw), 
+            PosePointRPY(dist_factor*4, 0, FLIGHT_ALT, 0, 0, fixed_yaw), 
+            PosePointRPY(dist_factor*5, 0, FLIGHT_ALT, 0, 0, fixed_yaw),  
+            PosePointRPY(dist_factor*6, 0, FLIGHT_ALT, 0, 0, fixed_yaw), 
+            PosePointRPY(dist_factor*7, 0, FLIGHT_ALT, 0, 0, fixed_yaw),  
+            PosePointRPY(dist_factor*8, 0, FLIGHT_ALT, 0, 0, fixed_yaw),  
+            PosePointRPY(dist_factor*9, 0, FLIGHT_ALT, 0, 0, fixed_yaw),  
+            PosePointRPY(dist_factor*10, 0, FLIGHT_ALT, 0, 0, fixed_yaw),  
+            PosePointRPY(dist_factor*11, 0, FLIGHT_ALT, 0, 0, fixed_yaw),
+            PosePointRPY(dist_factor*12, 0, FLIGHT_ALT, 0, 0, fixed_yaw)
         ]
         self.vel = Twist()
         self.odom = Odometry()
@@ -230,7 +230,7 @@ class Avoidance:
         start_pose =  PoseStamped()
         start_pose.pose.position.x = self.local_pose.pose.position.x
         start_pose.pose.position.y = self.local_pose.pose.position.x
-        start_pose.pose.position.z = START_ALT
+        start_pose.pose.position.z = FLIGHT_ALT
 
         quaternion = transformations.quaternion_from_euler(0, 0, self.yaw_angle)
         start_pose.pose.orientation.x = quaternion[0]
@@ -303,7 +303,7 @@ class Avoidance:
 
         total_force = attractive_force + repulsive_force
 
-        if total_force[2] < 0 and self.local_pose.pose.position.z < START_ALT:
+        if total_force[2] < 0 and self.local_pose.pose.position.z < FLIGHT_ALT:
             total_force[2] = 0
 
         vector.vector.x = total_force[0]
@@ -346,7 +346,7 @@ if __name__ == '__main__':
     
         if current_status == Status.FlyMode:
             avoider.spin()
-        elif (avoider.local_pose.pose.position.z > START_ALT - HEIGHT_TRESHOLD) and current_status == Status.Takeoff:
+        elif (avoider.local_pose.pose.position.z > FLIGHT_ALT - HEIGHT_TRESHOLD) and current_status == Status.Takeoff:
             current_status = Status.FlyMode          
             rospy.loginfo("STATUS Change to FlyMode")
             

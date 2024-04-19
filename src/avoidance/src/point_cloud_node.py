@@ -303,22 +303,19 @@ class Avoidance:
 
         total_force = attractive_force + repulsive_force
 
-        # Ensure the drone does not lower its height
         if total_force[2] < 0 and self.local_pose.pose.position.z < START_ALT:
             total_force[2] = 0
 
-        # Update the velocity based on the computed force
         vector.vector.x = total_force[0]
         vector.vector.y = total_force[1]
         vector.vector.z = total_force[2]
 
-        # Compute the yaw angle
         self.yaw_angle = math.atan2(total_force[1], total_force[0])
 
         rospy.loginfo(f"Atractive: {attractive_force} \n Repulsive: {repulsive_force}")
         if rospy.Time.now() - self.last_published > rospy.Duration(0, 100000000):
-            self.pub_accel.publish(vector) # Publish vector
-            self.last_published = rospy.Time.now()  # Update the time of the last publish
+            self.pub_accel.publish(vector)
+            self.last_published = rospy.Time.now()
     def spin(self):
         self.potential_fields_avoidance()
 

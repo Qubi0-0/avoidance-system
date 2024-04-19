@@ -64,9 +64,6 @@ class Avoidance:
         self.pub_vel = rospy.Publisher(
             "/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
 
-        # self.sub_img = rospy.Subscriber(
-        #     '/iris/camera/rgb/image_raw', Image, self.img_callback, queue_size=1)
-        
         self.max_hor_vel = rospy.ServiceProxy(
             '/mavros/param/set', mavros_msgs.srv.ParamSet)
         
@@ -137,8 +134,8 @@ class Avoidance:
         rospy.wait_for_service('/mavros/param/set')
         try:
             self.max_hor_vel(param_id="MPC_XY_VEL_ALL", value=mavros_msgs.msg.ParamValue(real=max_velocity)) # type: ignore
-        except rospy.ServiceException as e:
-            print("Service max_horizontal_velocity (MPC_XY_VEL_MAX) call failed: %s" % e)
+        except rospy.ServiceException as exception:
+            print(f"Service max_horizontal_velocity (MPC_XY_VEL_MAX) call failed: {exception}")
 
     def positionCallback(self, msg: PoseStamped):
         self.local_pose.pose.position.x = msg.pose.position.x
@@ -151,10 +148,6 @@ class Avoidance:
 
     def state_callback(self, msg):
         self.current_state = msg
-
-    # def img_callback(self, msg: Image):
-    #     self.img = self.bridge.imgmsg_to_cv2(
-    #         msg, desired_encoding='bgra8').copy()
         
     def cloud_callback(self, cloud_msg):
         cloud_points = list(pc2.read_points(cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
@@ -162,7 +155,6 @@ class Avoidance:
 
         # Group the points
         self.clusters = self.group_points(self.obstacles)
-
     
     def group_points(self, cloud_points, eps=0.5, min_samples=30):
         # Apply a pre-processing step to reduce the number of points
@@ -302,8 +294,6 @@ class Avoidance:
 
         attractive_force = K_ATT * (goal_pos - current_pos)
         return attractive_force
-
-    import math
 
     def potential_fields_avoidance(self):
         vector = Vector3Stamped()

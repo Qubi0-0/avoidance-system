@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
 from re import A
 import rospy
-from geometry_msgs.msg import PoseStamped, Twist, Vector3Stamped
-from mavros_msgs.msg import State
-from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest
-from sensor_msgs.msg import Image
-import mavros_msgs.srv
-from nav_msgs.msg import Odometry
+from geometry_msgs.msg import PoseStamped, Twist
 from cv_bridge import CvBridge
-import tf2_ros
 import numpy as np
 import math
 from tf import transformations
@@ -22,7 +16,6 @@ FLIGHT_ALT = 10 # alt for drone flight
 M_PI = 3.14159265359
 TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.1
-DEPTH_TRESHOLD = 5   # threshold for depth camera in meters
 HEIGHT_TRESHOLD = 1
 K_ATT = 0.01  # Attractive force constant
 K_REP = 1.0  # Repulsive force constant
@@ -97,6 +90,8 @@ class Avoidance:
         self.last_published = rospy.Time.now()
         self.flight_status = Status.Takeoff
         self.yaw_angle = 180
+        self.local_yaw = 1
+
 
     def poseStamped_to_rpy(self, source: PoseStamped):
         rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
@@ -115,6 +110,9 @@ class Avoidance:
         rpy = transformations.euler_from_quaternion([msg.pose.orientation.x,msg.pose.orientation.y,
                     msg.pose.orientation.z,msg.pose.orientation.w])
         self.local_yaw = rpy[2]
+        self.drone_position = np.array([self.local_pose.pose.position.x,
+                                        self.local_pose.pose.position.y,
+                                        self.local_pose.pose.position.z])
 
     def state_callback(self, msg):
         self.current_state = msg
@@ -128,12 +126,12 @@ class Avoidance:
             self.clusters = self.group_points(self.obstacles)
             
     def group_points(self, cloud_points, eps=0.5, min_samples=10, max_distance=30):
-        # distances = np.linalg.norm(cloud_points, axis=1)
+        distances = np.linalg.norm(cloud_points, axis=1)
 
-        # cloud_points = cloud_points[distances <= max_distance]
+        cloud_points = cloud_points[distances <= max_distance]
 
         # Apply a pre-processing step to reduce the number of points
-        cloud_points = cloud_points[::10]  # Take every 5th point
+        cloud_points = cloud_points[::10]  # Take every nth point
 
         # Apply DBSCAN to cloud_points
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(cloud_points)
@@ -149,7 +147,7 @@ class Avoidance:
 
         # Create a list to hold the centroid and dispersion of each cluster
         clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
-        rospy.loginfo(f"Number of Clusters: {len(clusters)} \n Example {clusters[0]}")
+        # rospy.loginfo(f"Number of Clusters: {len(clusters)} \n Example {clusters[0]}")
         self.publish_clusters(clusters)
         return clusters
 
@@ -232,13 +230,32 @@ class Avoidance:
             marker.action = marker.ADD
         
             # Add the drone's position to the centroid's position
-            centroid += self.drone_position
+            # Get the current drone position
+            drone_position = self.drone_position
+
+            # rospy.loginfo the drone position for debugging
+            rospy.loginfo(f"Drone position: {drone_position}")
+
+            # Get the current centroid
+            current_centroid = centroid
+
+            # rospy.loginfo the current centroid for debugging
+            rospy.loginfo(f"Current centroid: {current_centroid}")
+
+            # Add the drone's position to the centroid's position
+            updated_centroid = current_centroid + drone_position
+
+            # rospy.loginfo the updated centroid for debugging
+            rospy.loginfo(f"Updated centroid: {updated_centroid}")
+
+            # Update the centroid
+            centroid = updated_centroid
 
             # Set the marker's position
-            marker.pose.position.x = 0
-            marker.pose.position.y = 0
-            marker.pose.position.z = 0
-            factor = 0.1
+            marker.pose.position.x = centroid[0]
+            marker.pose.position.y = centroid[1]
+            marker.pose.position.z = centroid[2]
+            factor = 0.8
             # Set the marker's size proportional to the standard deviation
             marker.scale.x = std_dev * factor
             marker.scale.y = std_dev * factor

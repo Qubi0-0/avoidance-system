@@ -25,7 +25,7 @@ POS_TRESHOLD = 0.1
 DEPTH_TRESHOLD = 5   # threshold for depth camera in meters
 HEIGHT_TRESHOLD = 1
 K_ATT = 0.01  # Attractive force constant
-K_REP = 0.005  # Repulsive force constant
+K_REP = 0.05  # Repulsive force constant
 
 class PosePointRPY:
     def __init__(self, x, y, z, roll, pitch, yaw):
@@ -178,10 +178,10 @@ class Avoidance:
         
         return clusters
 
-    def switch_to_offboard(self):
-        if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
+    def switch_to_offboard(self, type):
+        if(self.current_state.mode != type and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
             if(self.set_mode_client.call(self.offb_set_mode).mode_sent == True):
-                rospy.loginfo("OFFBOARD enabled")
+                rospy.loginfo(f"{type} enabled")
             
             self.last_req = rospy.Time.now()
         else:
@@ -274,31 +274,47 @@ class Avoidance:
         attractive_force = K_ATT * (goal_pos - current_pos)
         return attractive_force
 
+    def compute_height_force(self):
+        force_factor = 1
+        height_difference = FLIGHT_ALT - self.local_pose.pose.position.z
+        z_force = height_difference * force_factor
+
+        return z_force
+
     def potential_fields_avoidance(self):
-        vector = Vector3Stamped()
+        twist_msg = Twist()
 
         attractive_force = self.compute_attractive_force()
         repulsive_force = self.compute_repulsive_force()
 
         total_force = attractive_force + repulsive_force
         self.yaw_angle = math.atan2(attractive_force[1], attractive_force[0]) #  + math.pi
+        # self.yaw_angle = 180
+        yaw_error = self.yaw_angle - self.local_yaw
+        yaw_error = (yaw_error + math.pi) % (2 * math.pi) - math.pi
+        z_force = self.compute_height_force()
 
-        if self.local_pose.pose.position.z < FLIGHT_ALT:
-            total_force[2] = 1
-        elif total_force[2] < 0 and self.local_pose.pose.position.z < FLIGHT_ALT:
-            total_force[2] = 0
+        twist_msg.linear.x = total_force[0]
+        twist_msg.linear.y = total_force[1]
+        twist_msg.linear.z = total_force[2] + z_force
 
-        vector.vector.x = total_force[0]
-        vector.vector.y = total_force[1]
-        vector.vector.z = total_force[2]
+        rospy.loginfo(f"\n Value of Total Force: {total_force} \n")
+
+        # Set the angular velocity to 0
+        twist_msg.angular.x = 0
+        twist_msg.angular.y = 0
+        twist_msg.angular.z = yaw_error * 0.1
 
 
-        # rospy.loginfo(f"\n Atractive: \n x: {attractive_force[0]}, y: {attractive_force[1]}, z: {attractive_force[2]} \n Repulsive:\n x: {repulsive_force[0]}, y: {repulsive_force[1]}, z: {repulsive_force[2]}")
-        if rospy.Time.now() - self.last_published > rospy.Duration(0, 100000000):
-            self.pub_accel.publish(vector)
+        rospy.loginfo(f"\n Atractive: \n x: {attractive_force[0]}, y: {attractive_force[1]}, z: {attractive_force[2]} \n Repulsive:\n x: {repulsive_force[0]}, y: {repulsive_force[1]}, z: {repulsive_force[2]}")
+        if rospy.Time.now() - self.last_published > rospy.Duration(0, 200000000):
+            self.pub_vel.publish(twist_msg)
             self.last_published = rospy.Time.now()
+
+
     def spin(self):
         self.potential_fields_avoidance()
+        # self.fly_straight()
 
 
 if __name__ == '__main__':
@@ -317,13 +333,15 @@ if __name__ == '__main__':
         avoider.rate.sleep()
 
     avoider.offb_set_mode.custom_mode = 'OFFBOARD'
+    # avoider.offb_set_mode.custom_mode = 'POSCTL'
     avoider.arm_cmd.value = True
 
     avoider.last_req = rospy.Time.now()  
     rospy.loginfo("Preparing to takeoff")
     while(not rospy.is_shutdown()):
-        avoider.switch_to_offboard()
-    
+        avoider.switch_to_offboard(avoider.offb_set_mode.custom_mode)
+
+
         if avoider.flight_status == Status.FlyMode:
             avoider.spin()
         elif (avoider.local_pose.pose.position.z > FLIGHT_ALT - HEIGHT_TRESHOLD) and avoider.flight_status == Status.Takeoff:

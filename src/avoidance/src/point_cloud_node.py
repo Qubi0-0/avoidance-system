@@ -25,7 +25,7 @@ POS_TRESHOLD = 0.1
 DEPTH_TRESHOLD = 5   # threshold for depth camera in meters
 HEIGHT_TRESHOLD = 1
 K_ATT = 0.01  # Attractive force constant
-K_REP = 0.05  # Repulsive force constant
+K_REP = 1.0  # Repulsive force constant
 
 class PosePointRPY:
     def __init__(self, x, y, z, roll, pitch, yaw):
@@ -159,7 +159,7 @@ class Avoidance:
     
     def group_points(self, cloud_points, eps=0.5, min_samples=30):
         # Apply a pre-processing step to reduce the number of points
-        cloud_points = cloud_points[::10]  # Take every 10th point
+        cloud_points = cloud_points[::5]  # Take every 5th point
 
         # Apply DBSCAN to cloud_points
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(cloud_points)
@@ -288,8 +288,8 @@ class Avoidance:
         repulsive_force = self.compute_repulsive_force()
 
         total_force = attractive_force + repulsive_force
-        self.yaw_angle = math.atan2(attractive_force[1], attractive_force[0]) #  + math.pi
-        # self.yaw_angle = 180
+        self.yaw_angle = math.atan2(attractive_force[1], attractive_force[0])
+
         yaw_error = self.yaw_angle - self.local_yaw
         yaw_error = (yaw_error + math.pi) % (2 * math.pi) - math.pi
         z_force = self.compute_height_force()
@@ -298,15 +298,12 @@ class Avoidance:
         twist_msg.linear.y = total_force[1]
         twist_msg.linear.z = total_force[2] + z_force
 
-        rospy.loginfo(f"\n Value of Total Force: {total_force} \n")
-
-        # Set the angular velocity to 0
         twist_msg.angular.x = 0
         twist_msg.angular.y = 0
-        twist_msg.angular.z = yaw_error * 0.1
+        twist_msg.angular.z = yaw_error * 0.3
 
 
-        rospy.loginfo(f"\n Atractive: \n x: {attractive_force[0]}, y: {attractive_force[1]}, z: {attractive_force[2]} \n Repulsive:\n x: {repulsive_force[0]}, y: {repulsive_force[1]}, z: {repulsive_force[2]}")
+        rospy.loginfo(f"\n Atractive: \n x: {attractive_force[0]}, y: {attractive_force[1]}, z: {attractive_force[2]} \n Repulsive:\n x: {repulsive_force[0]}, y: {repulsive_force[1]}, z: {repulsive_force[2]} \n Value of Total Force: {total_force} \n")
         if rospy.Time.now() - self.last_published > rospy.Duration(0, 200000000):
             self.pub_vel.publish(twist_msg)
             self.last_published = rospy.Time.now()

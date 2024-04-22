@@ -131,7 +131,7 @@ class Avoidance:
         cloud_points = cloud_points[distances <= max_distance]
 
         # Apply a pre-processing step to reduce the number of points
-        cloud_points = cloud_points[::10]  # Take every nth point
+        cloud_points = cloud_points[::3]  # Take every nth point
 
         # Apply DBSCAN to cloud_points
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(cloud_points)
@@ -147,7 +147,7 @@ class Avoidance:
 
         # Create a list to hold the centroid and dispersion of each cluster
         clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
-        # rospy.loginfo(f"Number of Clusters: {len(clusters)} \n Example {clusters[0]}")
+        rospy.loginfo(f"Number of Clusters: {len(clusters)} \n Example {clusters[0]}")
         self.publish_clusters(clusters)
         return clusters
 
@@ -234,19 +234,19 @@ class Avoidance:
             drone_position = self.drone_position
 
             # rospy.loginfo the drone position for debugging
-            rospy.loginfo(f"Drone position: {drone_position}")
+            # rospy.loginfo(f"Drone position: {drone_position}")
 
             # Get the current centroid
             current_centroid = centroid
 
             # rospy.loginfo the current centroid for debugging
-            rospy.loginfo(f"Current centroid: {current_centroid}")
+            # rospy.loginfo(f"Current centroid: {current_centroid}")
 
             # Add the drone's position to the centroid's position
             updated_centroid = current_centroid + drone_position
 
             # rospy.loginfo the updated centroid for debugging
-            rospy.loginfo(f"Updated centroid: {updated_centroid}")
+            # rospy.loginfo(f"Updated centroid: {updated_centroid}")
 
             # Update the centroid
             centroid = updated_centroid

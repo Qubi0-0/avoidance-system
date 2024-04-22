@@ -14,11 +14,11 @@ import math
 from tf import transformations
 import sensor_msgs.point_cloud2 as pc2
 from sklearn.cluster import DBSCAN
-from sklearn.cluster import MeanShift
 from enum import Enum
+from visualization_msgs.msg import Marker, MarkerArray
 
 
-FLIGHT_ALT = 5 # alt for drone flight
+FLIGHT_ALT = 10 # alt for drone flight
 M_PI = 3.14159265359
 TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.1
@@ -81,6 +81,8 @@ class Avoidance:
 
         self.state_sub = rospy.Subscriber("mavros/state", State, callback=self.state_callback)
         
+        self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+
         fixed_yaw = 180
         dist_factor = -10
         self.avoid_position = PosePointRPY(1, 0, FLIGHT_ALT,  0, 0, fixed_yaw)
@@ -97,7 +99,7 @@ class Avoidance:
             PosePointRPY(dist_factor*9, 0, FLIGHT_ALT, 0, 0, fixed_yaw),  
             PosePointRPY(dist_factor*10, 0, FLIGHT_ALT, 0, 0, fixed_yaw),  
             PosePointRPY(dist_factor*11, 0, FLIGHT_ALT, 0, 0, fixed_yaw),
-            PosePointRPY(dist_factor*12, 0, FLIGHT_ALT, 0, 0, fixed_yaw)
+            PosePointRPY(0, 180, FLIGHT_ALT, 0, 0, fixed_yaw)
         ]
         self.vel = Twist()
         self.odom = Odometry()
@@ -155,28 +157,8 @@ class Avoidance:
         self.obstacles = np.array(cloud_points)
 
         # Group the points
-        self.clusters = self.group_points(self.obstacles)
-    
-    def group_points(self, cloud_points, eps=0.5, min_samples=30):
-        # Apply a pre-processing step to reduce the number of points
-        cloud_points = cloud_points[::5]  # Take every 5th point
-
-        # Apply DBSCAN to cloud_points
-        db = DBSCAN(eps=eps, min_samples=min_samples).fit(cloud_points)
-
-        # Get the labels of the clusters
-        labels = db.labels_
-
-        # Convert labels to a list
-        labels_list = labels.tolist()
-
-        # Number of clusters in labels, ignoring noise if present.
-        n_clusters = len(set(labels_list)) - (1 if -1 in labels_list else 0)
-
-        # Create a list to hold the centroid and dispersion of each cluster
-        clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
-        
-        return clusters
+        if cloud_points:
+            self.clusters = self.group_points(self.obstacles)
 
     def switch_to_offboard(self, type):
         if(self.current_state.mode != type and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
@@ -247,11 +229,40 @@ class Avoidance:
         else:
             self.state = 1
 
+    def group_points(self, cloud_points, eps=0.5, min_samples=10, max_distance=30):
+        # distances = np.linalg.norm(cloud_points, axis=1)
+
+        # cloud_points = cloud_points[distances <= max_distance]
+
+        # Apply a pre-processing step to reduce the number of points
+        cloud_points = cloud_points[::10]  # Take every 5th point
+
+        # Apply DBSCAN to cloud_points
+        db = DBSCAN(eps=eps, min_samples=min_samples).fit(cloud_points)
+
+        # Get the labels of the clusters
+        labels = db.labels_
+
+        # Convert labels to a list
+        labels_list = labels.tolist()
+
+        # Number of clusters in labels, ignoring noise if present.
+        n_clusters = len(set(labels_list)) - (1 if -1 in labels_list else 0)
+
+        # Create a list to hold the centroid and dispersion of each cluster
+        clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
+        rospy.loginfo(f"Number of Clusters: {len(clusters)} \n Example {clusters[0]}")
+        self.publish_clusters(clusters)
+        return clusters
+
     def compute_repulsive_force(self):
         repulsive_force = np.zeros(3)
 
         if self.clusters:
             for obstacle, std_dev in self.clusters:
+                # # Add the drone's position to the obstacle's position
+                # obstacle += self.drone_position
+
                 # Compute the distance between the drone and the obstacle
                 distance = np.linalg.norm(self.drone_position - obstacle)
 
@@ -303,7 +314,7 @@ class Avoidance:
         twist_msg.angular.z = yaw_error * 0.3
 
 
-        rospy.loginfo(f"\n Atractive: \n x: {attractive_force[0]}, y: {attractive_force[1]}, z: {attractive_force[2]} \n Repulsive:\n x: {repulsive_force[0]}, y: {repulsive_force[1]}, z: {repulsive_force[2]} \n Value of Total Force: {total_force} \n")
+        # rospy.loginfo(f"\n Atractive: \n x: {attractive_force[0]}, y: {attractive_force[1]}, z: {attractive_force[2]} \n Repulsive:\n x: {repulsive_force[0]}, y: {repulsive_force[1]}, z: {repulsive_force[2]} \n Value of Total Force: {total_force} \n")
         if rospy.Time.now() - self.last_published > rospy.Duration(0, 200000000):
             self.pub_vel.publish(twist_msg)
             self.last_published = rospy.Time.now()
@@ -311,8 +322,40 @@ class Avoidance:
 
     def spin(self):
         self.potential_fields_avoidance()
-        # self.fly_straight()
 
+
+    def publish_clusters(self, clusters):
+        marker_array = MarkerArray()
+
+        for i, (centroid, std_dev) in enumerate(clusters):
+            marker = Marker()
+            marker.header.frame_id = "map"
+            marker.type = marker.SPHERE
+            marker.action = marker.ADD
+        
+            # Add the drone's position to the centroid's position
+            centroid += self.drone_position
+
+            # Set the marker's position
+            marker.pose.position.x = centroid[0]
+            marker.pose.position.y = centroid[1]
+            marker.pose.position.z = centroid[2]
+            factor = 0.1
+            # Set the marker's size proportional to the standard deviation
+            marker.scale.x = std_dev * factor
+            marker.scale.y = std_dev * factor
+            marker.scale.z = std_dev * factor
+
+            marker.color.a = 1.0
+            marker.color.r = 0.0
+            marker.color.g = 1.0
+            marker.color.b = 0.0
+            marker.pose.orientation.w = 1.0
+            marker.id = i
+
+            marker_array.markers.append(marker) # type: ignore
+
+        self.marker_pub.publish(marker_array)
 
 if __name__ == '__main__':
     rospy.init_node('avoidance_node') 

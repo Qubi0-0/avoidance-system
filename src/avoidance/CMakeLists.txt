@@ -10,6 +10,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   geometry_msgs
+  pcl_conversions
+  pcl_ros
   # ompl
 )
 # find_package(octomap REQUIRED)

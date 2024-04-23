@@ -29,4 +29,5 @@ def publish_transform():
 
 if __name__ == '__main__':
     rospy.init_node('transform_publisher_node')
+    rospy.loginfo("Node has been initiated")
     publish_transform()

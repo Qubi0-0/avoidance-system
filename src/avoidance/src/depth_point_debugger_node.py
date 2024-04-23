@@ -2,15 +2,18 @@
 from re import A
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist
+import geometry_msgs.msg
 from cv_bridge import CvBridge
 import numpy as np
 import math
 from tf import transformations
+import tf2_ros
 import sensor_msgs.point_cloud2 as pc2
 from sklearn.cluster import DBSCAN
 from enum import Enum
 from visualization_msgs.msg import Marker, MarkerArray
-
+import matplotlib.pyplot as plt
+from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 
 FLIGHT_ALT = 10 # alt for drone flight
 M_PI = 3.14159265359
@@ -19,6 +22,7 @@ POS_TRESHOLD = 0.1
 HEIGHT_TRESHOLD = 1
 K_ATT = 0.01  # Attractive force constant
 K_REP = 1.0  # Repulsive force constant
+
 
 class PosePointRPY:
     def __init__(self, x, y, z, roll, pitch, yaw):
@@ -46,7 +50,6 @@ class Status(Enum):
 
 class Avoidance:
 
-
     def __init__(self):
         self.pose = rospy.Subscriber(
             "/mavros/local_position/pose", PoseStamped, self.positionCallback)
@@ -57,6 +60,8 @@ class Avoidance:
         self.sub_cloud = rospy.Subscriber(
             '/iris/camera/depth/points', pc2.PointCloud2, self.cloud_callback, queue_size=1)
         
+        self.cloud_pub = rospy.Publisher( 'pointcloud' , pc2.PointCloud2, queue_size=10)
+
         self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
 
         fixed_yaw = 180
@@ -91,7 +96,7 @@ class Avoidance:
         self.flight_status = Status.Takeoff
         self.yaw_angle = 180
         self.local_yaw = 1
-
+        self.obstacles = np.array([])
 
     def poseStamped_to_rpy(self, source: PoseStamped):
         rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
@@ -118,24 +123,51 @@ class Avoidance:
         self.current_state = msg
         
     def cloud_callback(self, cloud_msg):
-        cloud_points = list(pc2.read_points(cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
-        self.obstacles = np.array(cloud_points)
+        # cloud_points = list(pc2.read_points(cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
+        tf_buffer = tf2_ros.Buffer()
+        listener = tf2_ros.TransformListener(tf_buffer)
+        
+        # Wait for the transform from camera frame to drone frame to become available
+        transform = tf_buffer.lookup_transform("base_link", "camera_link", rospy.Time(0), rospy.Duration(1))
+
+        # Transform the point cloud
+        transformed_cloud = do_transform_cloud(cloud_msg, transform)
+
+        # Convert the transformed point cloud to a numpy array
+        transformed_points = list(pc2.read_points(transformed_cloud, skip_nans=True, field_names=("x", "y", "z")))
+        transformed_points = transformed_points[::30]
+        # self.obstacles = np.array(cloud_points)
+        self.obstacles = np.array(transformed_points)
 
         # Group the points
-        if cloud_points:
+        if np.size(self.obstacles) > 0:
             self.clusters = self.group_points(self.obstacles)
-            
-    def group_points(self, cloud_points, eps=0.5, min_samples=10, max_distance=30):
+
+    def plot(self):
+        points = self.obstacles[::100]
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(points[:,0], points[:,1], points[:,2])
+
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+        plt.show()  
+
+    def group_points(self, cloud_points, eps=0.1, min_samples=10, max_distance=20):
         distances = np.linalg.norm(cloud_points, axis=1)
 
-        cloud_points = cloud_points[distances <= max_distance]
-
+        # cloud_points = cloud_points[distances <= max_distance]
+        
         # Apply a pre-processing step to reduce the number of points
-        cloud_points = cloud_points[::3]  # Take every nth point
+        # cloud_points = cloud_points[::15]  # Take every nth point
 
-        # Apply DBSCAN to cloud_points
+
+        start_time = rospy.get_time()
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(cloud_points)
-
+        end_time = rospy.get_time()
+        rospy.loginfo(f"DBSCAN fitting took {end_time - start_time} seconds")
         # Get the labels of the clusters
         labels = db.labels_
 
@@ -147,8 +179,9 @@ class Avoidance:
 
         # Create a list to hold the centroid and dispersion of each cluster
         clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
-        rospy.loginfo(f"Number of Clusters: {len(clusters)} \n Example {clusters[0]}")
-        self.publish_clusters(clusters)
+        if len(clusters) > 0:
+            rospy.loginfo(f"Number of Clusters: {len(clusters)} \n Example {clusters[0]}")
+            self.publish_clusters(clusters)
         return clusters
 
     def compute_repulsive_force(self):
@@ -234,32 +267,32 @@ class Avoidance:
             drone_position = self.drone_position
 
             # rospy.loginfo the drone position for debugging
-            # rospy.loginfo(f"Drone position: {drone_position}")
+            rospy.loginfo(f"Drone position: {drone_position}")
 
             # Get the current centroid
             current_centroid = centroid
 
             # rospy.loginfo the current centroid for debugging
-            # rospy.loginfo(f"Current centroid: {current_centroid}")
+            rospy.loginfo(f"Current centroid: {current_centroid}")
 
             # Add the drone's position to the centroid's position
             updated_centroid = current_centroid + drone_position
 
             # rospy.loginfo the updated centroid for debugging
-            # rospy.loginfo(f"Updated centroid: {updated_centroid}")
+            rospy.loginfo(f"Updated centroid: {updated_centroid}")
 
             # Update the centroid
             centroid = updated_centroid
 
             # Set the marker's position
-            marker.pose.position.x = centroid[0]
-            marker.pose.position.y = centroid[1]
-            marker.pose.position.z = centroid[2]
-            factor = 0.8
+            marker.pose.position.x = centroid[1]
+            marker.pose.position.y = centroid[2]
+            marker.pose.position.z = centroid[0]
+            scale_factor = 0.8
             # Set the marker's size proportional to the standard deviation
-            marker.scale.x = std_dev * factor
-            marker.scale.y = std_dev * factor
-            marker.scale.z = std_dev * factor
+            marker.scale.x = std_dev * scale_factor
+            marker.scale.y = std_dev * scale_factor
+            marker.scale.z = std_dev * scale_factor
 
             marker.color.a = 1.0
             marker.color.r = 0.0
@@ -278,6 +311,7 @@ if __name__ == '__main__':
     rospy.loginfo("Marker view node initiated")
 
     while(not rospy.is_shutdown()):
- 
         avoider.spin()
+
+    # avoider.plot()
  

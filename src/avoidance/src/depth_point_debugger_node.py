@@ -128,7 +128,7 @@ class Avoidance:
         listener = tf2_ros.TransformListener(tf_buffer)
         
         # Wait for the transform from camera frame to drone frame to become available
-        transform = tf_buffer.lookup_transform("base_link", "camera_link", rospy.Time(0), rospy.Duration(1))
+        transform = tf_buffer.lookup_transform("odom", "drone_link", rospy.Time(0), rospy.Duration(1))
 
         # Transform the point cloud
         transformed_cloud = do_transform_cloud(cloud_msg, transform)
@@ -179,8 +179,9 @@ class Avoidance:
 
         # Create a list to hold the centroid and dispersion of each cluster
         clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
+        rospy.loginfo(f"Number of Clusters: {len(clusters)}")
         if len(clusters) > 0:
-            rospy.loginfo(f"Number of Clusters: {len(clusters)} \n Example {clusters[0]}")
+            rospy.loginfo(f"\n Example {clusters[0]}")
             self.publish_clusters(clusters)
         return clusters
 
@@ -258,31 +259,31 @@ class Avoidance:
 
         for i, (centroid, std_dev) in enumerate(clusters):
             marker = Marker()
-            marker.header.frame_id = "map"
+            marker.header.frame_id = "odom"
             marker.type = marker.SPHERE
             marker.action = marker.ADD
         
-            # Add the drone's position to the centroid's position
-            # Get the current drone position
-            drone_position = self.drone_position
+            # # Add the drone's position to the centroid's position
+            # # Get the current drone position
+            # drone_position = self.drone_position
 
-            # rospy.loginfo the drone position for debugging
-            rospy.loginfo(f"Drone position: {drone_position}")
+            # # rospy.loginfo the drone position for debugging
+            # rospy.loginfo(f"Drone position: {drone_position}")
 
-            # Get the current centroid
-            current_centroid = centroid
+            # # Get the current centroid
+            # current_centroid = centroid
 
-            # rospy.loginfo the current centroid for debugging
-            rospy.loginfo(f"Current centroid: {current_centroid}")
+            # # rospy.loginfo the current centroid for debugging
+            # rospy.loginfo(f"Current centroid: {current_centroid}")
 
-            # Add the drone's position to the centroid's position
-            updated_centroid = current_centroid + drone_position
+            # # Add the drone's position to the centroid's position
+            # updated_centroid = current_centroid + drone_position
 
-            # rospy.loginfo the updated centroid for debugging
-            rospy.loginfo(f"Updated centroid: {updated_centroid}")
+            # # rospy.loginfo the updated centroid for debugging
+            # rospy.loginfo(f"Updated centroid: {updated_centroid}")
 
-            # Update the centroid
-            centroid = updated_centroid
+            # # Update the centroid
+            # centroid = updated_centroid
 
             # Set the marker's position
             marker.pose.position.x = centroid[1]

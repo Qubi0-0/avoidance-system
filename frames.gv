@@ -1,18 +1,19 @@
 digraph G {
-"map" -> "map_ned"[label="Broadcaster: /mavros\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 2569.268 sec old)\nBuffer length: 0.000 sec\n"];
-"odom" -> "odom_ned"[label="Broadcaster: /mavros\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 2569.268 sec old)\nBuffer length: 0.000 sec\n"];
-"base_link" -> "base_link_frd"[label="Broadcaster: /mavros\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 2569.268 sec old)\nBuffer length: 0.000 sec\n"];
-"base_link" -> "camera_link"[label="Broadcaster: /avoidance_node\nAverage rate: 10.228 Hz\nMost recent transform: 2569.178 ( 0.090 sec old)\nBuffer length: 3.422 sec\n"];
+"map" -> "map_ned"[label="Broadcaster: /mavros\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 572.167 sec old)\nBuffer length: 0.000 sec\n"];
+"odom" -> "odom_ned"[label="Broadcaster: /mavros\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 572.167 sec old)\nBuffer length: 0.000 sec\n"];
+"base_link" -> "base_link_frd"[label="Broadcaster: /mavros\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 572.167 sec old)\nBuffer length: 0.000 sec\n"];
+"odom" -> "drone_link"[label="Broadcaster: /transform_publisher_node\nAverage rate: 5.333 Hz\nMost recent transform: 572.016 ( 0.151 sec old)\nBuffer length: 3.000 sec\n"];
+"drone_link" -> "camera_link"[label="Broadcaster: /transform_publisher_node\nAverage rate: 5.333 Hz\nMost recent transform: 572.116 ( 0.051 sec old)\nBuffer length: 3.000 sec\n"];
 edge [style=invis];
  subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
-"Recorded at time: 2569.268"[ shape=plaintext ] ;
+"Recorded at time: 572.167"[ shape=plaintext ] ;
  }->"map";
 edge [style=invis];
  subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
-"Recorded at time: 2569.268"[ shape=plaintext ] ;
+"Recorded at time: 572.167"[ shape=plaintext ] ;
  }->"odom";
 edge [style=invis];
  subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
-"Recorded at time: 2569.268"[ shape=plaintext ] ;
+"Recorded at time: 572.167"[ shape=plaintext ] ;
  }->"base_link";
 }

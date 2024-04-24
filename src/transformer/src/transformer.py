@@ -9,6 +9,7 @@ import numpy as np
 import math
 from tf.transformations import quaternion_from_euler
 
+RATE = 10.0
 
 class Transformer:
 
@@ -17,22 +18,24 @@ class Transformer:
             "/mavros/local_position/pose", PoseStamped, self.positionCallback)
 
         self.local_pose = PoseStamped()
+        self.rate = rospy.Rate(RATE)
 
+        
     def publish_transform_camera(self):
 
         br = tf2_ros.TransformBroadcaster()
         t = geometry_msgs.msg.TransformStamped()
-        rate = rospy.Rate(10.0)
+        
 
         t.header.stamp = rospy.Time.now()
         t.header.frame_id = "drone_link"
         t.child_frame_id = "camera_link"
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.1
-        r = 90 * math.pi / 180
+        t.transform.translation.z = 0.0
+        r = 90  * math.pi / 180
         p = 180 * math.pi / 180
-        y = 90 * math.pi / 180
+        y = 90  * math.pi / 180
 
         q = quaternion_from_euler(r,p,y)
 
@@ -43,12 +46,11 @@ class Transformer:
 
         br.sendTransform(t)
 
-        rate.sleep()
 
     def publish_transform_drone(self):
         br = tf2_ros.TransformBroadcaster()
         t = geometry_msgs.msg.TransformStamped()
-        rate = rospy.Rate(10.0)
+
 
         t.header.stamp = rospy.Time.now()
         t.header.frame_id = "odom"
@@ -63,7 +65,6 @@ class Transformer:
 
         br.sendTransform(t)
 
-        rate.sleep()
 
     def positionCallback(self, msg: PoseStamped):
         self.local_pose.pose.position.x = msg.pose.position.x
@@ -80,3 +81,4 @@ if __name__ == '__main__':
     while not rospy.is_shutdown():
         transformer.publish_transform_camera()
         transformer.publish_transform_drone()
+        transformer.rate.sleep()

@@ -97,6 +97,7 @@ class Avoidance:
         self.yaw_angle = 180
         self.local_yaw = 1
         self.obstacles = np.array([])
+        self.pre_transformed = np.array([])
 
     def poseStamped_to_rpy(self, source: PoseStamped):
         rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
@@ -123,21 +124,19 @@ class Avoidance:
         self.current_state = msg
         
     def cloud_callback(self, cloud_msg):
-        # cloud_points = list(pc2.read_points(cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
+        cloud_points = list(pc2.read_points(cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
+
         tf_buffer = tf2_ros.Buffer()
         listener = tf2_ros.TransformListener(tf_buffer)
-        
-        # Wait for the transform from camera frame to drone frame to become available
-        transform = tf_buffer.lookup_transform("odom", "drone_link", rospy.Time(0), rospy.Duration(1))
-
-        # Transform the point cloud
+        self.pre_transformed = np.array(cloud_points) 
+        transform = tf_buffer.lookup_transform("odom", "point_link", rospy.Time(0), rospy.Duration(1))
         transformed_cloud = do_transform_cloud(cloud_msg, transform)
-
-        # Convert the transformed point cloud to a numpy array
         transformed_points = list(pc2.read_points(transformed_cloud, skip_nans=True, field_names=("x", "y", "z")))
-        transformed_points = transformed_points[::30]
+
+        transformed_points = transformed_points[::1000]
         # self.obstacles = np.array(cloud_points)
-        self.obstacles = np.array(transformed_points)
+        # self.obstacles = np.array(transformed_points)
+        self.publish_clusters(transformed_points)
 
         # Group the points
         if np.size(self.obstacles) > 0:
@@ -145,17 +144,19 @@ class Avoidance:
 
     def plot(self):
         points = self.obstacles[::100]
+        post_points = self.pre_transformed[::10]
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(points[:,0], points[:,1], points[:,2])
-
+        ax.scatter(points[:,0], points[:,1], points[:,2], label = "after")
+        ax.scatter(post_points[:,0], post_points[:,1], post_points[:,2], label = 'before')
+        ax.legend()
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
 
         plt.show()  
 
-    def group_points(self, cloud_points, eps=0.1, min_samples=10, max_distance=20):
+    def group_points(self, cloud_points, eps=1, min_samples=10, max_distance=20):
         distances = np.linalg.norm(cloud_points, axis=1)
 
         # cloud_points = cloud_points[distances <= max_distance]
@@ -257,7 +258,7 @@ class Avoidance:
     def publish_clusters(self, clusters):
         marker_array = MarkerArray()
 
-        for i, (centroid, std_dev) in enumerate(clusters):
+        for i, centroid in enumerate(clusters):
             marker = Marker()
             marker.header.frame_id = "odom"
             marker.type = marker.SPHERE
@@ -291,9 +292,9 @@ class Avoidance:
             marker.pose.position.z = centroid[0]
             scale_factor = 0.8
             # Set the marker's size proportional to the standard deviation
-            marker.scale.x = std_dev * scale_factor
-            marker.scale.y = std_dev * scale_factor
-            marker.scale.z = std_dev * scale_factor
+            marker.scale.x = scale_factor
+            marker.scale.y = scale_factor
+            marker.scale.z = scale_factor
 
             marker.color.a = 1.0
             marker.color.r = 0.0

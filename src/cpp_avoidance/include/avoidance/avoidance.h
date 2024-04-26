@@ -16,7 +16,7 @@
 #include <Eigen/Geometry>
 
 #define FLIGHT_ALT 10 // altitude for drone flight
-#define M_PI 3.14159265359
+#define M_PI 3.14159265358979323846
 #define TARGET_ANGL (1 * (M_PI / 180.0))
 #define POS_TRESHOLD 0.1
 #define HEIGHT_TRESHOLD 1

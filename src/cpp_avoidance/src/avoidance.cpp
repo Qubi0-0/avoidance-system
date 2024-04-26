@@ -1,6 +1,9 @@
 #include "avoidance.h"
 #include "pcl_ros/transforms.h"
 
+
+using PointCloudPtr = pcl::PointCloud<pcl::PointXYZ>::Ptr;
+
 PosePointRPY::PosePointRPY(double x, double y, double z, double roll, double pitch, double yaw) : roll(roll), pitch(pitch), yaw(yaw) {
     pos.pose.position.x = x;
     pos.pose.position.y = y;
@@ -20,7 +23,7 @@ Avoidance::Avoidance(const ros::NodeHandle& nh) : nh_(nh), tf_listener_(tf_buffe
     // Define other fixed positions as needed
 
     flight_status_ = Status::Takeoff;
-    yaw_angle_ = 3,14;
+    yaw_angle_ = M_PI;
     last_published_ = ros::Time::now();
 }
 
@@ -44,34 +47,37 @@ void Avoidance::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_ms
     pcl::PointCloud<pcl::PointXYZ> cloud;
     pcl::fromPCLPointCloud2(pcl_pc2, cloud);
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
+    PointCloudPtr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
     // Perform any necessary filtering on the cloud
     *cloud_filtered = cloud;
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_transformed(new pcl::PointCloud<pcl::PointXYZ>());
-    tf::StampedTransform transform;
+    // Downsample the cloud by selecting every 1000th point
+    PointCloudPtr cloud_downsampled(new pcl::PointCloud<pcl::PointXYZ>());
+    for (int i = 0; i < cloud_filtered->points.size(); i += 1000) {
+        cloud_downsampled->points.push_back(cloud_filtered->points[i]);
+    }
+
+    PointCloudPtr cloud_transformed(new pcl::PointCloud<pcl::PointXYZ>());
+    geometry_msgs::TransformStamped transform_stamped;
     try {
-        tf_buffer_.lookupTransform("odom", "point_link", ros::Time(0), ros::Duration(1));
-        pcl_ros::transformPointCloud(*cloud_filtered, *cloud_transformed, transform);
+        transform_stamped = tf_buffer_.lookupTransform("odom", "camera_link", ros::Time::now(), ros::Duration(1));
+        pcl_ros::transformPointCloud(*cloud_downsampled, *cloud_transformed, transform_stamped.transform);
     } catch (tf2::TransformException& ex) {
         ROS_WARN("%s", ex.what());
         return;
     }
-
     // Group the points
     // Implement point grouping logic using DBSCAN or any other method
 
     // Publish the clstered points
     std::vector<Eigen::Vector3d> clusters;
+    for (const auto& point : cloud_transformed->points) {
+        clusters.push_back(Eigen::Vector3d(point.x, point.y, point.z));
+    }
     // Populate 'clusters' with clustered points
     publishClusters(clusters);
 }
 
-void Avoidance::spin() {
-    // Implement avoidance logic using potential fields or any other method
-    // Publish velocity commands based on avoidance logic
-    ROS_INFO("SPINNING");
-}
 
 void Avoidance::publishClusters(const std::vector<Eigen::Vector3d>& clusters) {
     visualization_msgs::MarkerArray marker_array;

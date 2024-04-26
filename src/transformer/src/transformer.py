@@ -4,12 +4,10 @@ import rospy
 import tf2_ros
 import geometry_msgs.msg
 from geometry_msgs.msg import PoseStamped
-from tf import transformations
-import numpy as np
 import math
 from tf.transformations import quaternion_from_euler, quaternion_multiply, euler_from_quaternion
 
-RATE = 50.0
+RATE = 10.0
 
 class Transformer:
 

@@ -2,7 +2,6 @@
 from re import A
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist
-import geometry_msgs.msg
 from cv_bridge import CvBridge
 import numpy as np
 import math
@@ -12,7 +11,6 @@ import sensor_msgs.point_cloud2 as pc2
 from sklearn.cluster import DBSCAN
 from enum import Enum
 from visualization_msgs.msg import Marker, MarkerArray
-import matplotlib.pyplot as plt
 from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 
 FLIGHT_ALT = 10 # alt for drone flight
@@ -59,10 +57,8 @@ class Avoidance:
         
         self.sub_cloud = rospy.Subscriber(
             '/iris/camera/depth/points', pc2.PointCloud2, self.cloud_callback, queue_size=1)
-        
-        self.cloud_pub = rospy.Publisher( 'pointcloud' , pc2.PointCloud2, queue_size=10)
 
-        self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+        self.marker_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=1)
 
         fixed_yaw = 180
         dist_factor = -10
@@ -124,43 +120,24 @@ class Avoidance:
         self.current_state = msg
         
     def cloud_callback(self, cloud_msg):
-        cloud_points = list(pc2.read_points(cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
-
         tf_buffer = tf2_ros.Buffer()
         listener = tf2_ros.TransformListener(tf_buffer)
-        self.pre_transformed = np.array(cloud_points) 
-        transform = tf_buffer.lookup_transform("odom", "point_link", rospy.Time(0), rospy.Duration(1))
+        transform = tf_buffer.lookup_transform("odom", "camera_link", rospy.Time(0), rospy.Duration(0, int( 4*10E8)))
         transformed_cloud = do_transform_cloud(cloud_msg, transform)
         transformed_points = list(pc2.read_points(transformed_cloud, skip_nans=True, field_names=("x", "y", "z")))
 
         transformed_points = transformed_points[::1000]
-        # self.obstacles = np.array(cloud_points)
-        # self.obstacles = np.array(transformed_points)
-        self.publish_clusters(transformed_points)
+        self.obstacles = np.array(transformed_points)
+        # self.publish_clusters(transformed_points)
 
-        # Group the points
         if np.size(self.obstacles) > 0:
             self.clusters = self.group_points(self.obstacles)
 
-    def plot(self):
-        points = self.obstacles[::100]
-        post_points = self.pre_transformed[::10]
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(points[:,0], points[:,1], points[:,2], label = "after")
-        ax.scatter(post_points[:,0], post_points[:,1], post_points[:,2], label = 'before')
-        ax.legend()
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-
-        plt.show()  
-
-    def group_points(self, cloud_points, eps=1, min_samples=10, max_distance=20):
-        distances = np.linalg.norm(cloud_points, axis=1)
-
-        # cloud_points = cloud_points[distances <= max_distance]
+    def group_points(self, cloud_points, eps=1, min_samples=10, max_distance=30):
         
+        distances = np.linalg.norm(cloud_points - self.drone_position, axis=1)
+        cloud_points = cloud_points[distances <= max_distance]
+        self.publish_clusters(cloud_points)
         # Apply a pre-processing step to reduce the number of points
         # cloud_points = cloud_points[::15]  # Take every nth point
 
@@ -179,7 +156,7 @@ class Avoidance:
         n_clusters = len(set(labels_list)) - (1 if -1 in labels_list else 0)
 
         # Create a list to hold the centroid and dispersion of each cluster
-        clusters = [(np.mean(cloud_points[labels == i], axis=0), np.std(cloud_points[labels == i])) for i in range(n_clusters)]
+        clusters = [(np.mean(cloud_points[labels == i], axis=0)) for i in range(n_clusters)]
         rospy.loginfo(f"Number of Clusters: {len(clusters)}")
         if len(clusters) > 0:
             rospy.loginfo(f"\n Example {clusters[0]}")
@@ -263,35 +240,12 @@ class Avoidance:
             marker.header.frame_id = "odom"
             marker.type = marker.SPHERE
             marker.action = marker.ADD
-        
-            # # Add the drone's position to the centroid's position
-            # # Get the current drone position
-            # drone_position = self.drone_position
 
-            # # rospy.loginfo the drone position for debugging
-            # rospy.loginfo(f"Drone position: {drone_position}")
-
-            # # Get the current centroid
-            # current_centroid = centroid
-
-            # # rospy.loginfo the current centroid for debugging
-            # rospy.loginfo(f"Current centroid: {current_centroid}")
-
-            # # Add the drone's position to the centroid's position
-            # updated_centroid = current_centroid + drone_position
-
-            # # rospy.loginfo the updated centroid for debugging
-            # rospy.loginfo(f"Updated centroid: {updated_centroid}")
-
-            # # Update the centroid
-            # centroid = updated_centroid
-
-            # Set the marker's position
-            marker.pose.position.x = centroid[1]
-            marker.pose.position.y = centroid[2]
-            marker.pose.position.z = centroid[0]
+            marker.pose.position.x = centroid[0]
+            marker.pose.position.y = centroid[1]
+            marker.pose.position.z = centroid[2]
             scale_factor = 0.8
-            # Set the marker's size proportional to the standard deviation
+
             marker.scale.x = scale_factor
             marker.scale.y = scale_factor
             marker.scale.z = scale_factor
@@ -314,6 +268,4 @@ if __name__ == '__main__':
 
     while(not rospy.is_shutdown()):
         avoider.spin()
-
-    # avoider.plot()
  

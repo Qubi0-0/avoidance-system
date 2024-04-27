@@ -23,6 +23,9 @@
 #define K_ATT 0.01  // Attractive force constant
 #define K_REP 1.0    // Repulsive force constant
 
+// using EigenVec = std::vector<Eigen::Vector3d>;
+using PointCloudPtr = pcl::PointCloud<pcl::PointXYZ>::Ptr;
+
 class PosePointRPY {
 public:
     PosePointRPY(double x, double y, double z, double roll, double pitch, double yaw);
@@ -39,9 +42,10 @@ public:
 
     void positionCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
-    void spin();
-    void publishClusters(const std::vector<Eigen::Vector3d>& clusters);
-    void plot();
+    // void spin();
+    void publishClusters(const PointCloudPtr& clusters);
+    // void potentialFieldsAvoidance();
+    PointCloudPtr groupPoints(const PointCloudPtr& cloud);
 
 private:
     ros::NodeHandle nh_;
@@ -61,6 +65,7 @@ private:
     Eigen::MatrixXd pre_transformed_;
     ros::Time last_req_;
     ros::Time last_published_;
+    PointCloudPtr clusters_;
 };
 
 #endif // AVOIDANCE_H

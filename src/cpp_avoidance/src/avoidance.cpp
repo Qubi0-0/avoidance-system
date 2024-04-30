@@ -15,13 +15,11 @@ PosePointRPY::PosePointRPY(double x, double y, double z, double roll, double pit
 Avoidance::Avoidance(const ros::NodeHandle& nh) : nh_(nh), tf_listener_(tf_buffer_) {
     pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, &Avoidance::positionCallback, this);
     cloud_sub_ = nh_.subscribe<sensor_msgs::PointCloud2>("/iris/camera/depth/points", 1, &Avoidance::cloudCallback, this);
-    vel_pub_ = nh_.advertise<geometry_msgs::Twist>("/mavros/setpoint_velocity/cmd_vel_unstamped", 1);
+    vel_pub_ = nh_.advertise<geometry_msgs::Twist>("potential_twist", 1);
     marker_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
 
-    fixed_positions_.push_back(PosePointRPY(0, 0, FLIGHT_ALT, 0, 0, M_PI));
-    // Define other fixed positions as needed
-
-    flight_status_ = Status::Takeoff;
+    target_position_ = {0, 180, FLIGHT_ALT};
+    
     yaw_angle_ = M_PI;
     last_published_ = ros::Time::now();
 }
@@ -53,11 +51,11 @@ void Avoidance::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_ms
         cloud_downsampled->points.push_back(cloud->points[i]);
     }
 
-    ROS_INFO("Amount of Points %lu", cloud_downsampled->points.size());
+    // ROS_INFO("Amount of Points %lu", cloud_downsampled->points.size());
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud(cloud_downsampled);
     pass.setFilterFieldName("z");
-    pass.setFilterLimits(0.0, 30); // Keep points at a distance of 0 to "range" meters
+    pass.setFilterLimits(0.0, 29); // Keep points at a distance of 0 to "range" meters
     pass.filter(*cloud_downsampled);
     PointCloudPtr cloud_downranged(new pcl::PointCloud<pcl::PointXYZ>);
     cloud_downranged = cloud_downsampled;
@@ -113,12 +111,80 @@ PointCloudPtr Avoidance::groupPoints(const PointCloudPtr& cloud) {
     ros::Time end_time = ros::Time::now();
     ros::Duration elapsed_time = end_time - start_time;
 
-    ROS_INFO("Time taken by groupPoints: %f seconds", elapsed_time.toSec());
+    // ROS_INFO("Time taken by groupPoints: %f seconds", elapsed_time.toSec());
     return centroids;
 }
 
-// void Avoidance::potentialFieldsAvoidance()
+    Eigen::Vector3d Avoidance::computeRepulsiveForce() {
+        Eigen::Vector3d repulsive_force(0, 0, 0);
+        if (!clusters_) {
+            ROS_ERROR("Clusters is null");
+            return repulsive_force;
+        }
+        if (!clusters_->points.empty()) {
+            for (const auto& obstacle : clusters_->points) {
+                // Compute the distance between the drone and the obstacle
+                double distance = (drone_position_ - Eigen::Vector3d(obstacle.x, obstacle.y, obstacle.z)).norm();
 
+                // Compute the direction vector away from the obstacle
+                Eigen::Vector3d direction_vector = (drone_position_ - Eigen::Vector3d(obstacle.x, obstacle.y, obstacle.z)) / distance;
+
+                // Compute repulsive force using the inverse square law
+                repulsive_force += (K_REP / (distance * distance)) * direction_vector;
+            }
+        }
+
+        return repulsive_force;
+    }
+
+Eigen::Vector3d Avoidance::computeAttractiveForce() {
+        Eigen::Vector3d current_pos(local_pose_.pose.position.x,
+                                    local_pose_.pose.position.y,
+                                    local_pose_.pose.position.z);
+
+        Eigen::Vector3d attractive_force = K_ATT * (target_position_ - current_pos);
+        return attractive_force;
+    }
+
+double Avoidance::computeHeightForce() {
+    double force_factor = 1.0;
+    double height_difference = FLIGHT_ALT - local_pose_.pose.position.z;
+    double z_force = height_difference * force_factor;
+
+    return z_force;
+}
+
+void Avoidance::potentialFieldsAvoidance() {
+    geometry_msgs::Twist twist_msg;
+
+    Eigen::Vector3d attractive_force = computeAttractiveForce();
+    Eigen::Vector3d repulsive_force = computeRepulsiveForce();
+
+    Eigen::Vector3d total_force = attractive_force + repulsive_force;
+    yaw_angle_ = atan2(attractive_force[1], attractive_force[0]);
+
+    double yaw_error = yaw_angle_ - local_yaw_;
+    yaw_error = fmod((yaw_error + M_PI), (2 * M_PI)) - M_PI;
+    double z_force = computeHeightForce();
+
+    twist_msg.linear.x = total_force[0];
+    twist_msg.linear.y = total_force[1];
+    twist_msg.linear.z = total_force[2] + z_force;
+
+    twist_msg.angular.x = 0;
+    twist_msg.angular.y = 0;
+    twist_msg.angular.z = yaw_error * 0.3;
+
+    // Log info
+    ROS_INFO_STREAM("Attractive: x: " << attractive_force[0] << ", y: " << attractive_force[1] << ", z: " << attractive_force[2]);
+    ROS_INFO_STREAM("Repulsive: x: " << repulsive_force[0] << ", y: " << repulsive_force[1] << ", z: " << repulsive_force[2]);
+    ROS_INFO_STREAM("Total Force: " << total_force);
+
+    if (ros::Time::now() - last_published_ > ros::Duration(0.2)) {
+        vel_pub_.publish(twist_msg);
+        last_published_ = ros::Time::now();
+    }
+}
 
 void Avoidance::publishClusters(const PointCloudPtr& clusters) {
     visualization_msgs::MarkerArray marker_array;
@@ -142,16 +208,15 @@ void Avoidance::publishClusters(const PointCloudPtr& clusters) {
         marker_array.markers.push_back(marker);
     }
     marker_pub_.publish(marker_array);
-    ROS_INFO("Markers Published!");
 }
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "avoidance_node_cpp");
     ros::NodeHandle nh;
-
     Avoidance avoidance(nh);
-    while (ros::ok())
-        ros::spin();
-
+    while (ros::ok()) {
+        ros::spinOnce();
+        avoidance.potentialFieldsAvoidance();
+    }
     return 0;
 }

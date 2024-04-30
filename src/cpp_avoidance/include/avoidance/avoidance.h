@@ -15,15 +15,15 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+
 #define FLIGHT_ALT 10 // altitude for drone flight
 #define M_PI 3.14159265358979323846
 #define TARGET_ANGL (1 * (M_PI / 180.0))
 #define POS_TRESHOLD 0.1
 #define HEIGHT_TRESHOLD 1
 #define K_ATT 0.01  // Attractive force constant
-#define K_REP 1.0    // Repulsive force constant
+#define K_REP 100.0    // Repulsive force constant
 
-// using EigenVec = std::vector<Eigen::Vector3d>;
 using PointCloudPtr = pcl::PointCloud<pcl::PointXYZ>::Ptr;
 
 class PosePointRPY {
@@ -34,18 +34,18 @@ public:
     double roll, pitch, yaw;
 };
 
-enum Status { Takeoff, FlyMode };
-
 class Avoidance {
 public:
     Avoidance(const ros::NodeHandle& nh);
 
     void positionCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
     void cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
-    // void spin();
     void publishClusters(const PointCloudPtr& clusters);
-    // void potentialFieldsAvoidance();
     PointCloudPtr groupPoints(const PointCloudPtr& cloud);
+    Eigen::Vector3d computeRepulsiveForce();
+    Eigen::Vector3d computeAttractiveForce();
+    double computeHeightForce();
+    void potentialFieldsAvoidance();
 
 private:
     ros::NodeHandle nh_;
@@ -58,9 +58,8 @@ private:
     Eigen::Vector3d drone_position_;
     geometry_msgs::PoseStamped local_pose_;
     double local_yaw_;
-    Status flight_status_;
     double yaw_angle_;
-    std::vector<PosePointRPY> fixed_positions_;
+    Eigen::Vector3d target_position_;
     Eigen::MatrixXd obstacles_;
     Eigen::MatrixXd pre_transformed_;
     ros::Time last_req_;

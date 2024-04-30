@@ -45,3 +45,7 @@ target_link_libraries(avoidance_node
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   # include/avoidance
 )
+
+catkin_install_python(PROGRAMS src/mothernode.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

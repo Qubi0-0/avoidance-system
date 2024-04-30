@@ -1,0 +1,5 @@
+Przerobić takeoff_node tak aby został Mother_Node:
+    - Startował drona do góry.
+    - OFFBOARD
+    - Dostaje wektor ruchu (od CPP albo Pythona)
+    - Potem jakieś zapisywanie ruchu czy coś

@@ -128,14 +128,11 @@ class TakeOff:
         start_pose.pose.position.x = self.local_pose.pose.position.x
         start_pose.pose.position.y = self.local_pose.pose.position.x
         start_pose.pose.position.z = START_ALT
-        rollRad = 0 
-        pitchRad = 0 
-        yawRad = math.radians(240)
-        quaternion = transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
-        start_pose.pose.orientation.x = quaternion[0]
-        start_pose.pose.orientation.y = quaternion[1]
-        start_pose.pose.orientation.z = quaternion[2]
-        start_pose.pose.orientation.w = quaternion[3]
+
+        start_pose.pose.orientation.x = self.local_pose.pose.orientation.x
+        start_pose.pose.orientation.y = self.local_pose.pose.orientation.y
+        start_pose.pose.orientation.z = self.local_pose.pose.orientation.z
+        start_pose.pose.orientation.w = self.local_pose.pose.orientation.w
         self.pub_pose.publish(start_pose)
 
     def position_check(self, goal: PosePointRPY):

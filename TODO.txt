@@ -3,3 +3,10 @@ Przerobić takeoff_node tak aby został Mother_Node:
     - OFFBOARD
     - Dostaje wektor ruchu (od CPP albo Pythona)
     - Potem jakieś zapisywanie ruchu czy coś
+
+POMYSŁY:
+
+Zrezygnowałem z DBSCAN. Wychodzi, że w zasadzie to przeszkadza jedynie. Mimo to można porównać czas cyklu w Python i Cpp.
+
+Badania: 
+Może porównać Cpp z Pythonem bez DBSCAN i Z (CZAS działania itd.) Wtedy może olać trochę dokładność bo to ciężko jakkolwiek w sumie porównać. 

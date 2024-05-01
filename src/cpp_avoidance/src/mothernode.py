@@ -10,7 +10,7 @@ import math
 from tf import transformations
 
 
-START_ALT = 5 # alt for drone flight
+START_ALT = 8 # alt for drone flight
 M_PI = 3.14159265359
 TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.3
@@ -48,6 +48,8 @@ class TakeOff:
         self.pub_vel = rospy.Publisher(
             "/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
         
+        self.pub_sub = rospy.Subscriber("potential_twist", Twist, self.twist_callback)
+        
         self.max_hor_vel = rospy.ServiceProxy(
             '/mavros/param/set', mavros_msgs.srv.ParamSet)
 
@@ -59,8 +61,7 @@ class TakeOff:
 
         self.state_sub = rospy.Subscriber("mavros/state", State, callback=self.state_callback)
 
-        fixed_yaw = 180
-        self.avoid_position = PosePointRPY(1, 0, START_ALT,  0, 0, fixed_yaw)
+        self.avoid_position = PosePointRPY(1, 0, START_ALT,  0, 0, M_PI)
         self.vel = Twist()
         self.odom = Odometry()
         self.local_pose = PoseStamped()
@@ -71,6 +72,7 @@ class TakeOff:
         self.offb_set_mode.custom_mode = 'OFFBOARD'
         self.arm_cmd.value = True
         self.last_req = rospy.Time.now()
+        self.take_off_flag = False
 
     def poseStamped_to_rpy(self, source: PoseStamped):
         rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
@@ -81,13 +83,6 @@ class TakeOff:
 
         return result
 
-    def set_horizontal_velocity(self, max_velocity):
-        rospy.wait_for_service('/mavros/param/set')
-        try:
-            self.max_hor_vel(param_id="MPC_XY_VEL_ALL", value=mavros_msgs.msg.ParamValue(real=max_velocity)) # type: ignore
-        except rospy.ServiceException as e:
-            print("Service max_horizontal_velocity (MPC_XY_VEL_MAX) call failed: %s" % e)
-
     def positionCallback(self, msg: PoseStamped):
         self.local_pose.pose.position.x = msg.pose.position.x
         self.local_pose.pose.position.y = msg.pose.position.y
@@ -96,6 +91,9 @@ class TakeOff:
         rpy = transformations.euler_from_quaternion([msg.pose.orientation.x,msg.pose.orientation.y,
                     msg.pose.orientation.z,msg.pose.orientation.w])
         self.local_yaw = rpy[2]
+
+    def twist_callback(self, msg: Twist):
+        self.vel = msg
 
     def state_callback(self, msg):
         self.current_state = msg
@@ -126,8 +124,6 @@ class TakeOff:
         self.pub_pose.publish(pose)
 
     def publish_takeoff_point(self):
-        # self.set_horizontal_velocity(2)
-
         start_pose =  PoseStamped()
         start_pose.pose.position.x = self.local_pose.pose.position.x
         start_pose.pose.position.y = self.local_pose.pose.position.x
@@ -153,15 +149,16 @@ class TakeOff:
         curr_orient = self.local_pose.pose.orientation
         curr_euler = transformations.euler_from_quaternion(
             [curr_orient.x, curr_orient.y, curr_orient.z, curr_orient.w])
-        cr = abs(curr_euler[0] - math.radians(goal.roll)) < TARGET_ANGL
+        cr = abs(curr_euler[0] - math.radians(goal.roll))< TARGET_ANGL
         cp = abs(curr_euler[1] - math.radians(goal.pitch)) < TARGET_ANGL
         cy = abs(curr_euler[2] - math.radians(goal.yaw)) < TARGET_ANGL
         
         in_range = cr and cp and cy
-        # if in_range:
-            # rospy.loginfo(f"Desired Position Reached X:{self.fixed_positions[self.state].pos.pose.position.x} Y:{self.fixed_positions[self.state].pos.pose.position.y}")
+
         return in_range 
 
+    def avoidance(self):
+        self.pub_vel.publish(self.vel)
 
 if __name__ == '__main__':
     rospy.init_node('takeoff_node') 
@@ -184,8 +181,10 @@ if __name__ == '__main__':
     rospy.loginfo("Preparing to takeoff")
     while(not rospy.is_shutdown()):
         avoider.switch_to_offboard()
-        # Check if the drone has reached the desired altitude
-        avoider.publish_takeoff_point()
+        if not avoider.take_off_flag:
+            avoider.publish_takeoff_point()
+        else: 
+            avoider.avoidance()
         if avoider.local_pose.pose.position.z >= START_ALT - POS_TRESHOLD:
-            rospy.loginfo("Takeoff complete, stopping node")
-            break
+            avoider.take_off_flag = True
+            

@@ -18,14 +18,15 @@
 
 #define FLIGHT_ALT 10 // altitude for drone flight
 #define M_PI 3.14159265358979323846
-#define TARGET_ANGL (1 * (M_PI / 180.0))
 #define POS_TRESHOLD 0.1
 #define HEIGHT_TRESHOLD 1
-#define K_ATT 0.04  // Attractive force constant
-#define K_REP 100.0    // Repulsive force constant
-#define CLUSTER_TOLERANCE 0.7 // In m
-#define MIN_CLUSTER_SIZE 100
-#define MAX_CLUSTER_SIZE 5000
+// POTENTIAL FORCE PARAMS
+#define K_ATT 0.06  // Attractive force constant
+#define K_REP 2.0    // Repulsive force constant
+// DBSCAN PARAMS
+#define CLUSTER_TOLERANCE 0.3 // In m (max distance from points in one cluster)
+#define MIN_CLUSTER_SIZE 60
+#define MAX_CLUSTER_SIZE 1000
 
 using PointCloudPtr = pcl::PointCloud<pcl::PointXYZ>::Ptr;
 

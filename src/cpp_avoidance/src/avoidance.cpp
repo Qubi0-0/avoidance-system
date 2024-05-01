@@ -45,9 +45,9 @@ void Avoidance::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_ms
     pcl::fromPCLPointCloud2(pcl_pc2, *cloud);
 
 
-    // Downsample the cloud by selecting every 1000th point
+    // Downsample the cloud by selecting every Nth point
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downsampled(new pcl::PointCloud<pcl::PointXYZ>());
-    for (int i = 0; i < cloud->points.size(); i += 100) {
+    for (int i = 0; i < cloud->points.size(); i += 1000) {
         cloud_downsampled->points.push_back(cloud->points[i]);
     }
 
@@ -69,12 +69,22 @@ void Avoidance::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_ms
         ROS_WARN("%s", ex.what());
         return;
     }
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
-    // Perform any necessary filtering on the cloud
-    cloud_filtered = groupPoints(cloud_transformed);
 
-    clusters_ = cloud_filtered;
-    publishClusters(cloud_filtered);
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
+    // Perform any necessary filtering on the cloud
+    // cloud_filtered = groupPoints(cloud_transformed);
+
+    pcl::PassThrough<pcl::PointXYZ> pass2;
+    pass2.setInputCloud(cloud_transformed);
+    pass2.setFilterFieldName("z");
+    pass2.setFilterLimits(3.0, 29); // Keep points at a distance of 0 to "range" meters
+    pass2.filter(*cloud_transformed);
+    PointCloudPtr cloud_upranged(new pcl::PointCloud<pcl::PointXYZ>);
+    cloud_upranged = cloud_transformed;
+
+
+    clusters_ = cloud_upranged;
+    publishClusters(cloud_upranged);
 }
 
 PointCloudPtr Avoidance::groupPoints(const PointCloudPtr& cloud) {
@@ -130,6 +140,7 @@ PointCloudPtr Avoidance::groupPoints(const PointCloudPtr& cloud) {
                 Eigen::Vector3d direction_vector = (drone_position_ - Eigen::Vector3d(obstacle.x, obstacle.y, obstacle.z)) / distance;
 
                 // Compute repulsive force using the inverse square law
+
                 repulsive_force += (K_REP / (distance * distance)) * direction_vector;
             }
         }

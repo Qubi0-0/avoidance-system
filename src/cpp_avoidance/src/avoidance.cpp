@@ -187,6 +187,7 @@ void Avoidance::potentialFieldsAvoidance() {
 }
 
 void Avoidance::publishClusters(const PointCloudPtr& clusters) {
+    clusters->points.push_back(pcl::PointXYZ(target_position_[0],target_position_[1],target_position_[2]));
     visualization_msgs::MarkerArray marker_array;
     for (size_t i = 0; i < clusters->size(); ++i) {
         visualization_msgs::Marker marker;
@@ -200,9 +201,22 @@ void Avoidance::publishClusters(const PointCloudPtr& clusters) {
         marker.scale.y = 0.8;
         marker.scale.z = 0.8;
         marker.color.a = 1.0;
+        if (i == clusters->size() - 1) {
+        marker.color.r = 1.0;
+        marker.color.g = 0.0;
+        marker.color.b = 0.0;
+        marker.scale.x = 2.8;
+        marker.scale.y = 2.8;
+        marker.scale.z = 2.8;     
+        }
+        else {
+        marker.scale.x = 0.8;
+        marker.scale.y = 0.8;
+        marker.scale.z = 0.8;
         marker.color.r = 0.0;
         marker.color.g = 1.0;
         marker.color.b = 0.0;
+        }
         marker.pose.orientation.w = 1.0;
         marker.id = i;
         marker_array.markers.push_back(marker);

@@ -90,9 +90,9 @@ PointCloudPtr Avoidance::groupPoints(const PointCloudPtr& cloud) {
     // Perform DBSCAN
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-    ec.setClusterTolerance(0.7); // 70cm
-    ec.setMinClusterSize(100);
-    ec.setMaxClusterSize(5000);
+    ec.setClusterTolerance(CLUSTER_TOLERANCE); 
+    ec.setMinClusterSize(MIN_CLUSTER_SIZE);
+    ec.setMaxClusterSize(MAX_CLUSTER_SIZE);
     ec.setSearchMethod(tree);
     ec.setInputCloud(cloud);
     ec.extract(cluster_indices);

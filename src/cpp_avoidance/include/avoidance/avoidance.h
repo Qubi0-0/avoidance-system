@@ -21,8 +21,11 @@
 #define TARGET_ANGL (1 * (M_PI / 180.0))
 #define POS_TRESHOLD 0.1
 #define HEIGHT_TRESHOLD 1
-#define K_ATT 0.01  // Attractive force constant
+#define K_ATT 0.04  // Attractive force constant
 #define K_REP 100.0    // Repulsive force constant
+#define CLUSTER_TOLERANCE 0.7 // In m
+#define MIN_CLUSTER_SIZE 100
+#define MAX_CLUSTER_SIZE 5000
 
 using PointCloudPtr = pcl::PointCloud<pcl::PointXYZ>::Ptr;
 

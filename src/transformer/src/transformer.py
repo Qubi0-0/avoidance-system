@@ -51,32 +51,21 @@ class Transformer:
         
 
         t.header.stamp = rospy.Time.now()
-        t.header.frame_id = "odom"
-        t.child_frame_id = "point_link"
-        r = 0  * math.pi / 180
-        p = 0 * math.pi / 180
-        y = 0  * math.pi / 180
-        current_orientation = [self.local_pose.pose.orientation.x, 
-                               self.local_pose.pose.orientation.y, 
-                               self.local_pose.pose.orientation.z, 
-                               self.local_pose.pose.orientation.w]
-        # q = quaternion_from_euler(r,p,y)
-        # new_orientation = quaternion_multiply(current_orientation, q)
-        rot = euler_from_quaternion(current_orientation)
-        r = rot[0]
-        p = rot[1]
-        y = rot[2]
+        t.header.frame_id = "drone_link"
+        t.child_frame_id = "rplidar_link"
+        t.transform.translation.x = 0.0
+        t.transform.translation.y = 0.0
+        t.transform.translation.z = 0.0
+        r = 90  * math.pi / 180
+        p = 180 * math.pi / 180
+        y = 90  * math.pi / 180
 
-        new_orientation = quaternion_from_euler(r,p,y)
+        q = quaternion_from_euler(r,p,y)
 
-
-        t.transform.translation.x = self.local_pose.pose.position.z
-        t.transform.translation.y = self.local_pose.pose.position.x 
-        t.transform.translation.z = self.local_pose.pose.position.y
-        t.transform.rotation.x = new_orientation[0]
-        t.transform.rotation.y = new_orientation[1]
-        t.transform.rotation.z = new_orientation[2]
-        t.transform.rotation.w = new_orientation[3]
+        t.transform.rotation.x = q[0]
+        t.transform.rotation.y = q[1]
+        t.transform.rotation.z = q[2]
+        t.transform.rotation.w = q[3]
 
         br.sendTransform(t)
 
@@ -114,5 +103,5 @@ if __name__ == '__main__':
     while not rospy.is_shutdown():
         transformer.publish_transform_camera()
         transformer.publish_transform_drone()
-        # transformer.publish_transform_points()
+        transformer.publish_transform_points()
         transformer.rate.sleep()

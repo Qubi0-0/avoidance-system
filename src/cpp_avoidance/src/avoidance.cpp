@@ -177,10 +177,18 @@ void Avoidance::potentialFieldsAvoidance() {
     double yaw_error = yaw_angle_ - local_yaw_;
     yaw_error = fmod((yaw_error + M_PI), (2 * M_PI)) - M_PI;
     double z_force = computeHeightForce();
+    total_force[2] = total_force[2] + z_force;
 
+    for (int i = 0; i < 3; i++) {
+        if (total_force[i] > FORCE_TREHSHOLD) {
+            total_force[i] = FORCE_TREHSHOLD;
+        } else if (total_force[i] < -FORCE_TREHSHOLD) {
+            total_force[i] = -FORCE_TREHSHOLD;
+        }
+    }
     twist_msg.linear.x = total_force[0];
     twist_msg.linear.y = total_force[1];
-    twist_msg.linear.z = total_force[2] + z_force;
+    twist_msg.linear.z = total_force[2];
 
     twist_msg.angular.x = 0;
     twist_msg.angular.y = 0;

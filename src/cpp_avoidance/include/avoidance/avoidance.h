@@ -23,6 +23,7 @@
 // POTENTIAL FORCE PARAMS
 #define K_ATT 0.06  // Attractive force constant
 #define K_REP 2.0    // Repulsive force constant
+#define FORCE_TREHSHOLD 2.0
 // DBSCAN PARAMS
 #define CLUSTER_TOLERANCE 0.3 // In m (max distance from points in one cluster)
 #define MIN_CLUSTER_SIZE 60

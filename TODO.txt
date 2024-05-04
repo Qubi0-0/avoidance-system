@@ -10,3 +10,5 @@ Zrezygnowałem z DBSCAN. Wychodzi, że w zasadzie to przeszkadza jedynie. Mimo t
 
 Badania: 
 Może porównać Cpp z Pythonem bez DBSCAN i Z (CZAS działania itd.) Wtedy może olać trochę dokładność bo to ciężko jakkolwiek w sumie porównać. 
+Zrobić wykres  Pól potencjałów jako mapa path planning i porównać np z tą ulepszoną z (https://sci-hub.se/10.1109/ccdc.2010.5498836) oraz sprawdzić różne parametry. Wystarczy to wtedy 
+wyenerować po prostu w jakimś Pythonie z Matplotlib i tyle. Bez kombinowania.

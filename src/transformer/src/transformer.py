@@ -103,5 +103,5 @@ if __name__ == '__main__':
     while not rospy.is_shutdown():
         transformer.publish_transform_camera()
         transformer.publish_transform_drone()
-        transformer.publish_transform_points()
+        # transformer.publish_transform_points()
         transformer.rate.sleep()

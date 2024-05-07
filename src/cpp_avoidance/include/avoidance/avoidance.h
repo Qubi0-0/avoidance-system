@@ -25,9 +25,9 @@
 #define K_REP 2.0    // Repulsive force constant
 #define FORCE_TREHSHOLD 2.0
 // DBSCAN PARAMS
-#define CLUSTER_TOLERANCE 0.3 // In m (max distance from points in one cluster)
-#define MIN_CLUSTER_SIZE 60
-#define MAX_CLUSTER_SIZE 1000
+#define CLUSTER_TOLERANCE 0.5 // In m (max distance from points in one cluster)
+#define MIN_CLUSTER_SIZE 20
+#define MAX_CLUSTER_SIZE 3000
 
 using PointCloudPtr = pcl::PointCloud<pcl::PointXYZ>::Ptr;
 

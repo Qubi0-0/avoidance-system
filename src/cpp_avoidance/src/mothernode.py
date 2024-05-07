@@ -158,7 +158,7 @@ class TakeOff:
         self.pub_vel.publish(self.vel)
 
 if __name__ == '__main__':
-    rospy.init_node('takeoff_node') 
+    rospy.init_node('Mother_node') 
     avoider = TakeOff()
     rospy.loginfo("Takeoff node initiated")
 

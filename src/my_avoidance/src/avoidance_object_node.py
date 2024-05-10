@@ -44,7 +44,7 @@ class PosePointRPY:
         rollRad = math.radians(roll)
         pitchRad = math.radians(pitch)
         yawRad = math.radians(yaw)
-        quaternion = tf.transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
+        quaternion = tf.transformations.quaternion_from_euler(rollRad, pitchRad, yawRad) # type: ignore
         self.pos.pose.orientation.x = quaternion[0]
         self.pos.pose.orientation.y = quaternion[1]
         self.pos.pose.orientation.z = quaternion[2]
@@ -139,7 +139,10 @@ class Avoidance:
         self.last_req = rospy.Time.now()
         self.bridge = CvBridge()
         self.avoid_check = False
-        self.mean_mat = None
+        self.mean_mat = []
+        self.img_depth = None
+        self.img = None
+        self.avoid_dist = 0.0
 
     def poseStamped_to_rpy(self, source: PoseStamped):
 
@@ -154,7 +157,7 @@ class Avoidance:
     def set_horizontal_velocity(self,max_velocity):
         rospy.wait_for_service('/mavros/param/set')
         try:
-            self.max_hor_vel(param_id="MPC_XY_VEL_ALL", value=mavros_msgs.msg.ParamValue(real=max_velocity))
+            self.max_hor_vel(param_id="MPC_XY_VEL_ALL", value=mavros_msgs.msg.ParamValue(real=max_velocity)) # type: ignore
             # rospy.loginfo(f"horizontal velocity set to: {max_velocity}")
         except rospy.ServiceException as e:
             print("Service max_horizontal_velocity (MPC_XY_VEL_MAX) call failed: %s" % e)
@@ -166,7 +169,7 @@ class Avoidance:
         self.local_pose.pose.position.z = msg.pose.position.z
         self.local_pose.pose.orientation = msg.pose.orientation
         rpy = tf.transformations.euler_from_quaternion([msg.pose.orientation.x,msg.pose.orientation.y,
-                    msg.pose.orientation.z,msg.pose.orientation.w])
+                    msg.pose.orientation.z,msg.pose.orientation.w])  # type: ignore
         self.local_yaw = rpy[2]
 
     def depth_callback(self, msg: Image):
@@ -197,11 +200,12 @@ class Avoidance:
         return dist_mean
 
     def show_rgb_img(self):
-        for i in range(0,16):
-            self.img = cv.putText(self.img,str(self.mean_mat[i]),np.flip(self.img_spots[i]),cv.FONT_HERSHEY_SIMPLEX,0.6,(0,0,255))
-        cv.imshow("frame",self.img)
-        # cv.imshow("depth",self.last_depth)
-        cv.waitKey(1)
+        if self.img is not None:
+            for mean, spot in zip(self.mean_mat, self.img_spots):
+                self.img = cv.putText(self.img, str(mean), np.flip(spot), cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255))
+            cv.imshow("frame", self.img)
+            # cv.imshow("depth",self.last_depth)
+            cv.waitKey(1)
 
     def switch_to_offboard(self):
         if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5.0)):
@@ -287,7 +291,7 @@ class Avoidance:
 
     def pose_change_calc(self):
         # imgray = cv.cvtColor(self.img_depth, cv.COLOR_BGR2GRAY)
-        ret, thresh = cv.threshold(self.img_depth, 5, 20, cv.THRESH_BINARY)
+        ret, thresh = cv.threshold(self.img_depth, 5, 20, cv.THRESH_BINARY) # type: ignore
         contours = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(contours)
         self.point = []
@@ -324,7 +328,7 @@ class Avoidance:
             # rospy.loginfo("fixed rout needed")
         # else:
             # self.fixed_y_val = self.local_pose.pose.position.y + self.avoid_dist
-        changed_y_val = self.local_pose.pose.position.y + 0.3* self.avoid_dist
+        changed_y_val = self.local_pose.pose.position.y + 0.3 * self.avoid_dist
 
         self.avoid_position.pos.pose.position.x = self.fixed_positions[self.state].pos.pose.position.x
         self.avoid_position.pos.pose.position.y = changed_y_val
@@ -336,7 +340,7 @@ class Avoidance:
         self.rate.sleep()
 
     def spin(self):
-        # self.show_rgb_img()
+        self.show_rgb_img()
         mean_mat_up = self.mean_mat[0:49] # we don`t look on the bottom values of the camera
         self.pose_change_calc()
         if not any(sub_mat < DEPTH_TRESHOLD for sub_mat in mean_mat_up): # While depth camera doesn`t see close objects

@@ -126,7 +126,7 @@ class Avoidance:
         self.last_req = rospy.Time.now()
         self.bridge = CvBridge()
         self.avoid_check = False
-        self.mean_mat = None
+        self.mean_mat = []
 
     def poseStamped_to_rpy(self, source: PoseStamped):
 

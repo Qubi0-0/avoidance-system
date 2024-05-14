@@ -28,6 +28,7 @@ private:
     ros::NodeHandle nh_;
     ros::Subscriber cloud_sub_;
     ros::Publisher octomap_pub_;
+    ros::Publisher grid_pub_;
     octomap::OcTree octree_;
     tf2_ros::Buffer tf_buffer_;
 };

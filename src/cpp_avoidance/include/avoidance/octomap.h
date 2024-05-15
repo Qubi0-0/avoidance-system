@@ -24,7 +24,6 @@ private:
     ros::NodeHandle nh_;
     ros::Subscriber cloud_sub_;
     ros::Publisher octomap_pub_;
-    ros::Publisher marker_array_pub_;
     octomap::OcTree octree_;
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::TransformListener tf_listener_;

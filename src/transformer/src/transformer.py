@@ -5,8 +5,7 @@ import tf2_ros
 import geometry_msgs.msg
 from geometry_msgs.msg import PoseStamped
 import math
-from tf.transformations import quaternion_from_euler, quaternion_multiply, euler_from_quaternion
-
+from tf.transformations import quaternion_from_euler
 RATE = 10.0
 
 class Transformer:
@@ -103,5 +102,4 @@ if __name__ == '__main__':
     while not rospy.is_shutdown():
         transformer.publish_transform_camera()
         transformer.publish_transform_drone()
-        # transformer.publish_transform_points()
         transformer.rate.sleep()

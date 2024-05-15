@@ -33,14 +33,14 @@ include_directories(
 
 ## Declare a C++ executable
 add_executable(avoidance_node src/avoidance.cpp)
-
-
+add_executable(lidar_node src/lidar.cpp)
 add_executable(octomap_node src/octomap.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 add_dependencies(avoidance_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(octomap_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(lidar_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(avoidance_node
@@ -52,6 +52,14 @@ target_link_libraries(avoidance_node
   # include/avoidance
 )
 target_link_libraries(octomap_node
+  ${catkin_LIBRARIES}
+  ${EIGEN3_INCLUDE_DIR}
+  ${PCL_INCLUDE_DIRS}
+  ${OCTOMAP_LIBRARIES}
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  # include/avoidance
+)
+target_link_libraries(lidar_node
   ${catkin_LIBRARIES}
   ${EIGEN3_INCLUDE_DIR}
   ${PCL_INCLUDE_DIRS}

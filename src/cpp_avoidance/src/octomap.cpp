@@ -17,14 +17,14 @@ void AvoidanceOctomap::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& c
 
     // Downsample the cloud by selecting every Nth point
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downsampled(new pcl::PointCloud<pcl::PointXYZ>());
-    for (int i = 0; i < cloud->points.size(); i += 60) {
+    for (int i = 0; i < cloud->points.size(); i += 100) {
         cloud_downsampled->points.push_back(cloud->points[i]);
     }
 
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud(cloud_downsampled);
     pass.setFilterFieldName("z");
-    pass.setFilterLimits(0.0, 50); 
+    pass.setFilterLimits(0.0, 30); 
     pass.filter(*cloud_downsampled);
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downranged(new pcl::PointCloud<pcl::PointXYZ>);
@@ -45,8 +45,17 @@ void AvoidanceOctomap::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& c
         return;
     }
 
+    pcl::PassThrough<pcl::PointXYZ> pass2;
+    pass2.setInputCloud(cloud_transformed);
+    pass2.setFilterFieldName("z");
+    pass2.setFilterLimits(3.0, 29); // Keep points at a distance of 0 to "range" meters
+    pass2.filter(*cloud_transformed);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_upranged(new pcl::PointCloud<pcl::PointXYZ>);
+    cloud_upranged = cloud_transformed;
+
+
     octomap::Pointcloud octomap_cloud;
-    for (const auto& point : cloud_transformed->points) {
+    for (const auto& point : cloud_upranged->points) {
         octomap_cloud.push_back(point.x, point.y, point.z);
     }
 

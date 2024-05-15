@@ -13,16 +13,17 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <laser_geometry/laser_geometry.h>
 
 class AvoidanceLidar {
 public:
     AvoidanceLidar(const ros::NodeHandle& nh);
 
-    void cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
+    void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_msg);
 
 private:
     ros::NodeHandle nh_;
-    ros::Subscriber cloud_sub_;
+    ros::Subscriber scan_sub_;
     ros::Publisher octomap_pub_;
     octomap::OcTree octree_;
     tf2_ros::Buffer tf_buffer_;

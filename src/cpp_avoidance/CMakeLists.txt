@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   geometry_msgs
+  laser_geometry
   sensor_msgs
   tf2_ros
   tf

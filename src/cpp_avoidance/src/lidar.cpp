@@ -1,7 +1,7 @@
 #include "lidar.h"
 #include "pcl_ros/transforms.h"
 #include <pcl/filters/passthrough.h>
-
+#include <string.h>
 
 AvoidanceLidar::AvoidanceLidar(const ros::NodeHandle& nh)
     : nh_(nh), octree_(0.1), tf_listener_(tf_buffer_) {
@@ -22,9 +22,12 @@ void AvoidanceLidar::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_m
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_transformed(new pcl::PointCloud<pcl::PointXYZ>());
     geometry_msgs::TransformStamped transform_stamped;
+    std::string from_tf = "odom";
+    std::string to_tf = "drone_link";
+
     try {
-        if (tf_buffer_.canTransform("odom", "drone_link", ros::Time(0), ros::Duration(1.0))) {
-            transform_stamped = tf_buffer_.lookupTransform("odom", "camera_link", ros::Time(0));
+        if (tf_buffer_.canTransform(from_tf, to_tf, ros::Time(0), ros::Duration(1.0))) {
+            transform_stamped = tf_buffer_.lookupTransform(from_tf, to_tf, ros::Time(0));
             pcl_ros::transformPointCloud(*cloud, *cloud_transformed, transform_stamped.transform);
         } else {
             ROS_WARN("Transform from 'odom' to 'camera_link' not available");

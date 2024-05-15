@@ -14,8 +14,11 @@
 #include <pcl/segmentation/extract_clusters.h>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <string.h>
 
 
+#define TO_TF  "camera_link"
+#define FROM_TF "odom"
 #define FLIGHT_ALT 10 // altitude for drone flight
 #define M_PI 3.14159265358979323846
 #define POS_TRESHOLD 0.1

@@ -63,7 +63,7 @@ void Avoidance::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_ms
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_transformed(new pcl::PointCloud<pcl::PointXYZ>());
     geometry_msgs::TransformStamped transform_stamped;
     try {
-        transform_stamped = tf_buffer_.lookupTransform("odom", "camera_link", ros::Time::now(), ros::Duration(1));
+        transform_stamped = tf_buffer_.lookupTransform(FROM_TF, TO_TF, ros::Time::now(), ros::Duration(1));
         pcl_ros::transformPointCloud(*cloud_downranged, *cloud_transformed, transform_stamped.transform);
     } catch (tf2::TransformException& ex) {
         ROS_WARN("%s", ex.what());

@@ -13,6 +13,11 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <string.h>
+
+#define TO_TF  "camera_link"
+#define FROM_TF "odom"
+
 
 class AvoidanceOctomap {
 public:

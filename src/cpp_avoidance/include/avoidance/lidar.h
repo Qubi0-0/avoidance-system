@@ -14,6 +14,10 @@
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <laser_geometry/laser_geometry.h>
+#include <string.h>
+
+#define TO_TF  "camera_link"
+#define FROM_TF "odom"
 
 class AvoidanceLidar {
 public:

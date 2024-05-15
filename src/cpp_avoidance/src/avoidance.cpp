@@ -39,6 +39,7 @@ void Avoidance::positionCallback(const geometry_msgs::PoseStamped::ConstPtr& msg
 }
 
 void Avoidance::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg) {
+    ros::Time start_time = ros::Time::now();
     pcl::PCLPointCloud2 pcl_pc2;
     pcl_conversions::toPCL(*cloud_msg, pcl_pc2);
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -63,26 +64,30 @@ void Avoidance::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_ms
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_transformed(new pcl::PointCloud<pcl::PointXYZ>());
     geometry_msgs::TransformStamped transform_stamped;
     try {
-        transform_stamped = tf_buffer_.lookupTransform(FROM_TF, TO_TF, ros::Time::now(), ros::Duration(1));
+        transform_stamped = tf_buffer_.lookupTransform(TARGET_FRAME, SOURCE_FRAME, ros::Time::now(), ros::Duration(1));
         pcl_ros::transformPointCloud(*cloud_downranged, *cloud_transformed, transform_stamped.transform);
     } catch (tf2::TransformException& ex) {
         ROS_WARN("%s", ex.what());
         return;
     }
 
-    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
     // Perform any necessary filtering on the cloud
-    // cloud_filtered = groupPoints(cloud_transformed);
+    cloud_filtered = groupPoints(cloud_transformed);
 
     pcl::PassThrough<pcl::PointXYZ> pass2;
-    pass2.setInputCloud(cloud_transformed);
+    pass2.setInputCloud(cloud_filtered);
     pass2.setFilterFieldName("z");
     pass2.setFilterLimits(3.0, 29); // Keep points at a distance of 0 to "range" meters
-    pass2.filter(*cloud_transformed);
+    pass2.filter(*cloud_filtered);
     PointCloudPtr cloud_upranged(new pcl::PointCloud<pcl::PointXYZ>);
-    cloud_upranged = cloud_transformed;
+    cloud_upranged = cloud_filtered;
 
-
+    
+    ros::Time end_time = ros::Time::now();
+    ros::Duration elapsed_time = end_time - start_time;
+    mean_cloud_time += elapsed_time;
+    cloud_count ++;
     clusters_ = cloud_upranged;
     publishClusters(cloud_upranged);
 }
@@ -120,7 +125,8 @@ PointCloudPtr Avoidance::groupPoints(const PointCloudPtr& cloud) {
     
     ros::Time end_time = ros::Time::now();
     ros::Duration elapsed_time = end_time - start_time;
-
+    mean_DBSCAN_time += elapsed_time;
+    DBSCAN_count ++;
     // ROS_INFO("Time taken by groupPoints: %f seconds", elapsed_time.toSec());
     return centroids;
 }
@@ -250,6 +256,15 @@ int main(int argc, char** argv) {
     while (ros::ok()) {
         ros::spinOnce();
         avoidance.potentialFieldsAvoidance();
+        if (avoidance.cloud_count > 0) {
+        auto mean_cloud_time = avoidance.mean_cloud_time.toSec() / avoidance.cloud_count;
+        ROS_INFO("Average time taken by CloudCallback: %f seconds", mean_cloud_time);
     }
+        if (avoidance.DBSCAN_count > 0) {
+        auto mean_db_time = avoidance.mean_DBSCAN_time.toSec() / avoidance.DBSCAN_count;
+        ROS_INFO("Average time taken by DBSCAN: %f seconds", mean_db_time);
+    }
+    }
+
     return 0;
 }

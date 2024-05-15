@@ -17,8 +17,8 @@
 #include <string.h>
 
 
-#define TO_TF  "camera_link"
-#define FROM_TF "odom"
+#define SOURCE_FRAME "camera_link"
+#define TARGET_FRAME "odom"
 #define FLIGHT_ALT 10 // altitude for drone flight
 #define M_PI 3.14159265358979323846
 #define POS_TRESHOLD 0.1
@@ -73,6 +73,15 @@ private:
     ros::Time last_req_;
     ros::Time last_published_;
     PointCloudPtr clusters_;
+public:
+    // Timers
+    ros::Time mean_cloud_time;
+    int cloud_count = 0;
+    ros::Time mean_DBSCAN_time;
+    int DBSCAN_count = 0;
+    ros::Time mean_flight_time;
+    int flight_count = 0;
+
 };
 
 #endif // AVOIDANCE_H

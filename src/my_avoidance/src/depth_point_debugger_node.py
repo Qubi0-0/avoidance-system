@@ -18,8 +18,8 @@ M_PI = 3.14159265359
 TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.1
 HEIGHT_TRESHOLD = 1
-K_ATT = 0.01  # Attractive force constant
-K_REP = 1.0  # Repulsive force constant
+K_ATT = 0.06  # Attractive force constant
+K_REP = 2.0  # Repulsive force constant
 
 
 class PosePointRPY:
@@ -94,6 +94,10 @@ class Avoidance:
         self.local_yaw = 1
         self.obstacles = np.array([])
         self.pre_transformed = np.array([])
+        self.mean_time = 0.0
+        self.mean_time_callback = 0.0
+        self.count_time = 0
+        self.db_count_time = 0
 
     def poseStamped_to_rpy(self, source: PoseStamped):
         rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
@@ -120,6 +124,7 @@ class Avoidance:
         self.current_state = msg
         
     def cloud_callback(self, cloud_msg):
+        start_time = rospy.get_time()
         tf_buffer = tf2_ros.Buffer()
         listener = tf2_ros.TransformListener(tf_buffer)
         transform = tf_buffer.lookup_transform("odom", "camera_link", rospy.Time(0), rospy.Duration(0, int( 4*10E8)))
@@ -128,12 +133,16 @@ class Avoidance:
 
         transformed_points = transformed_points[::1000]
         self.obstacles = np.array(transformed_points)
-        # self.publish_clusters(transformed_points)
+        self.publish_clusters(transformed_points)
 
-        if np.size(self.obstacles) > 0:
-            self.clusters = self.group_points(self.obstacles)
+        end_time = rospy.get_time()
+        self.mean_time_callback += (end_time - start_time)
+        self.count_time += 1
 
-    def group_points(self, cloud_points, eps=1, min_samples=10, max_distance=30):
+        # if np.size(self.obstacles) > 0:
+        #     self.clusters = self.group_points(self.obstacles)
+
+    def group_points(self, cloud_points, eps=0.5, min_samples=20, max_distance=30):
         
         distances = np.linalg.norm(cloud_points - self.drone_position, axis=1)
         cloud_points = cloud_points[distances <= max_distance]
@@ -146,6 +155,8 @@ class Avoidance:
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(cloud_points)
         end_time = rospy.get_time()
         rospy.loginfo(f"DBSCAN fitting took {end_time - start_time} seconds")
+        self.mean_time += (end_time - start_time)
+        self.count_time += 1
         # Get the labels of the clusters
         labels = db.labels_
 
@@ -268,4 +279,10 @@ if __name__ == '__main__':
 
     while(not rospy.is_shutdown()):
         avoider.spin()
+    if avoider.db_count_time > 0:
+        avg_time = avoider.mean_time / avoider.db_count_time
+        rospy.loginfo(f"Average time taken by DBSCAN: {avg_time} seconds")
+    if avoider.count_time > 0:
+        avg_time = avoider.mean_time_callback / avoider.count_time
+        rospy.loginfo(f"Average time taken by Callback: {avg_time} seconds")
  

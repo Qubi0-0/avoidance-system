@@ -16,8 +16,8 @@
 #include <laser_geometry/laser_geometry.h>
 #include <string.h>
 
-#define TO_TF  "camera_link"
-#define FROM_TF "odom"
+#define SOURCE_FRAME "rplidar_link"
+#define TARGET_FRAME "odom"
 
 class AvoidanceLidar {
 public:

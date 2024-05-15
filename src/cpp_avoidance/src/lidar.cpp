@@ -25,8 +25,8 @@ void AvoidanceLidar::scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_m
 
 
     try {
-        if (tf_buffer_.canTransform(FROM_TF, TO_TF, ros::Time(0), ros::Duration(1.0))) {
-            transform_stamped = tf_buffer_.lookupTransform(FROM_TF, TO_TF, ros::Time(0));
+        if (tf_buffer_.canTransform(TARGET_FRAME, SOURCE_FRAME, ros::Time(0), ros::Duration(1.0))) {
+            transform_stamped = tf_buffer_.lookupTransform(TARGET_FRAME, SOURCE_FRAME, ros::Time(0));
             pcl_ros::transformPointCloud(*cloud, *cloud_transformed, transform_stamped.transform);
         } else {
             ROS_WARN("Transform from 'odom' to 'camera_link' not available");

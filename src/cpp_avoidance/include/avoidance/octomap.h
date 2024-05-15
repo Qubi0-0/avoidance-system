@@ -15,8 +15,8 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <string.h>
 
-#define TO_TF  "camera_link"
-#define FROM_TF "odom"
+#define SOURCE_FRAME "camera_link"
+#define TARGET_FRAME "odom"
 
 
 class AvoidanceOctomap {

@@ -50,21 +50,15 @@ class Transformer:
         
 
         t.header.stamp = rospy.Time.now()
-        t.header.frame_id = "drone_link"
+        t.header.frame_id = "odom"
         t.child_frame_id = "rplidar_link"
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.0
-        r = 90  * math.pi / 180
-        p = 180 * math.pi / 180
-        y = 90  * math.pi / 180
-
-        q = quaternion_from_euler(r,p,y)
-
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
+        t.transform.translation.x = self.local_pose.pose.position.x
+        t.transform.translation.y = self.local_pose.pose.position.y
+        t.transform.translation.z = self.local_pose.pose.position.z
+        t.transform.rotation.x = 0
+        t.transform.rotation.y = 0
+        t.transform.rotation.z = 0
+        t.transform.rotation.w = 1
 
         br.sendTransform(t)
 

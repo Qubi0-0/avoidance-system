@@ -43,7 +43,7 @@ class Transformer:
 
         br.sendTransform(t)
 
-    def publish_transform_points(self):
+    def publish_transform_lidar(self):
 
         br = tf2_ros.TransformBroadcaster()
         t = geometry_msgs.msg.TransformStamped()
@@ -102,4 +102,5 @@ if __name__ == '__main__':
     while not rospy.is_shutdown():
         transformer.publish_transform_camera()
         transformer.publish_transform_drone()
+        transformer.publish_transform_lidar()
         transformer.rate.sleep()

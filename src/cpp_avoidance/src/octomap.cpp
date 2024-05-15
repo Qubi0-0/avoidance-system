@@ -18,7 +18,7 @@ void AvoidanceOctomap::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& c
 
     // Downsample the cloud by selecting every Nth point
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downsampled(new pcl::PointCloud<pcl::PointXYZ>());
-    for (int i = 0; i < cloud->points.size(); i += 1000) {
+    for (int i = 0; i < cloud->points.size(); i += 100) {
         cloud_downsampled->points.push_back(cloud->points[i]);
     }
 
@@ -57,7 +57,7 @@ void AvoidanceOctomap::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& c
 
     octomap_msgs::Octomap octomap_msg;
     octomap_msg.header.stamp = ros::Time::now();
-    octomap_msg.header.frame_id = "camera_link";  
+    octomap_msg.header.frame_id = "odom";  
     octomap_msgs::binaryMapToMsg(octree_, octomap_msg);
 
     octomap_pub_.publish(octomap_msg);
@@ -68,31 +68,42 @@ void AvoidanceOctomap::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& c
     // Iterate over the leaf nodes of the Octomap
     for (octomap::OcTree::leaf_iterator it = octree_.begin_leafs(), end = octree_.end_leafs(); it != end; ++it) {
         if (octree_.isNodeOccupied(*it)) {
-            // Create a marker for each occupied node
-            visualization_msgs::Marker marker;
-            marker.header.frame_id = "camera_link";
-            marker.header.stamp = ros::Time::now();
-            marker.ns = "octomap";
-            marker.id = it.getDepth();
-            marker.type = visualization_msgs::Marker::CUBE;
-            marker.action = visualization_msgs::Marker::ADD;
-            marker.pose.position.x = it.getX();
-            marker.pose.position.y = it.getY();
-            marker.pose.position.z = it.getZ();
-            marker.pose.orientation.x = 0.0;
-            marker.pose.orientation.y = 0.0;
-            marker.pose.orientation.z = 0.0;
-            marker.pose.orientation.w = 1.0;
-            marker.scale.x = it.getSize();
-            marker.scale.y = it.getSize();
-            marker.scale.z = it.getSize();
-            marker.color.a = 1.0;
-            marker.color.r = 0.0;
-            marker.color.g = 1.0;
-            marker.color.b = 0.0;
+            // Check if a marker with the same id already exists in the MarkerArray
+            bool marker_exists = false;
+            for (size_t i = 0; i < marker_array.markers.size(); ++i) {
+                if (marker_array.markers[i].id == it.getDepth()) {
+                    marker_exists = true;
+                    break;
+                }
+            }
 
-            // Add the marker to the MarkerArray
-            marker_array.markers.push_back(marker);
+            // Create and add a new marker only if it doesn't already exist in the MarkerArray
+            if (!marker_exists) {
+                visualization_msgs::Marker marker;
+                marker.header.frame_id = "odom";
+                marker.header.stamp = ros::Time::now();
+                marker.ns = "octomap";
+                marker.id = it.getDepth();
+                marker.type = visualization_msgs::Marker::CUBE;
+                marker.action = visualization_msgs::Marker::ADD;
+                marker.pose.position.x = it.getX();
+                marker.pose.position.y = it.getY();
+                marker.pose.position.z = it.getZ();
+                marker.pose.orientation.x = 0.0;
+                marker.pose.orientation.y = 0.0;
+                marker.pose.orientation.z = 0.0;
+                marker.pose.orientation.w = 1.0;
+                marker.scale.x = it.getSize();
+                marker.scale.y = it.getSize();
+                marker.scale.z = it.getSize();
+                marker.color.a = 1.0;
+                marker.color.r = 0.0;
+                marker.color.g = 1.0;
+                marker.color.b = 0.0;
+
+                // Add the marker to the MarkerArray
+                marker_array.markers.push_back(marker);
+            }
         }
     }
 

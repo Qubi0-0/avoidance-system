@@ -128,10 +128,18 @@ class Avoidance:
         tf_buffer = tf2_ros.Buffer()
         listener = tf2_ros.TransformListener(tf_buffer)
         transform = tf_buffer.lookup_transform("odom", "camera_link", rospy.Time(0), rospy.Duration(0, int( 4*10E8)))
-        transformed_cloud = do_transform_cloud(cloud_msg, transform)
-        transformed_points = list(pc2.read_points(transformed_cloud, skip_nans=True, field_names=("x", "y", "z")))
 
-        transformed_points = transformed_points[::1000]
+        # Read points first
+        points = list(pc2.read_points(cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
+        points = points[::1000]
+        points = [point for point in points if point[2] <= 30]
+        # Convert the downsampled points back to a PointCloud2 message
+        downsampled_cloud = pc2.create_cloud_xyz32(cloud_msg.header, points)
+
+        # Transform the downsampled cloud
+        transformed_cloud = do_transform_cloud(downsampled_cloud, transform)
+        transformed_points = list(pc2.read_points(transformed_cloud, skip_nans=True, field_names=("x", "y", "z")))
+        transformed_points = [point for point in transformed_points if point[2] >= 3]
         self.obstacles = np.array(transformed_points)
         self.publish_clusters(transformed_points)
 
@@ -139,8 +147,8 @@ class Avoidance:
         self.mean_time_callback += (end_time - start_time)
         self.count_time += 1
 
-        # if np.size(self.obstacles) > 0:
-        #     self.clusters = self.group_points(self.obstacles)
+        if np.size(self.obstacles) > 0:
+            self.clusters = self.group_points(self.obstacles)
 
     def group_points(self, cloud_points, eps=0.5, min_samples=20, max_distance=30):
         

@@ -30,6 +30,7 @@ public:
 
     void cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
     void positionCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
+    bool has_reached_target(const geometry_msgs::Point& current_position, const geometry_msgs::Point& target_point);
     geometry_msgs::Point get_nearest_point_to_target(octomap::OcTree* octree);
     
 private:

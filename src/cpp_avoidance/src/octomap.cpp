@@ -86,7 +86,13 @@ void AvoidanceOctomap::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& c
     point_msg.header.stamp = ros::Time::now();
     point_msg.header.frame_id = "odom";
     point_msg.point = nearest_point;
-    goal_pub_.publish(point_msg);
+    geometry_msgs::Point drone_position;
+    drone_position.x = drone_position_.getX();
+    drone_position.y = drone_position_.getY();
+    drone_position.z = drone_position_.getZ();
+    if (!has_reached_target(drone_position, point_msg.point)) {
+        goal_pub_.publish(point_msg);
+    }
 
 
     octomap_msgs::Octomap octomap_msg;
@@ -96,6 +102,13 @@ void AvoidanceOctomap::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& c
 
     octomap_pub_.publish(octomap_msg);
 
+}
+
+bool AvoidanceOctomap::has_reached_target(const geometry_msgs::Point& current_position, const geometry_msgs::Point& target_point) {
+    double distance = sqrt(pow(target_point.x - current_position.x, 2) +
+                           pow(target_point.y - current_position.y, 2) +
+                           pow(target_point.z - current_position.z, 2));
+    return distance < 0.1;
 }
 
 geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTree* octree) {

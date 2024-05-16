@@ -48,7 +48,7 @@ void AvoidanceOctomap::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& c
     pcl::PassThrough<pcl::PointXYZ> pass2;
     pass2.setInputCloud(cloud_transformed);
     pass2.setFilterFieldName("z");
-    pass2.setFilterLimits(3.0, 29); // Keep points at a distance of 0 to "range" meters
+    pass2.setFilterLimits(3.0, 29); 
     pass2.filter(*cloud_transformed);
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_upranged(new pcl::PointCloud<pcl::PointXYZ>);
     cloud_upranged = cloud_transformed;
@@ -70,7 +70,12 @@ void AvoidanceOctomap::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& c
 
     octomap_pub_.publish(octomap_msg);
 
+
 }
+
+
+
+
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "avoidance_octomap_node");

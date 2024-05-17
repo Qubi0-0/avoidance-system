@@ -26,4 +26,4 @@
 *.swp
 
 # Test pkg for droniada
-/src/droniada_test
+# /src/droniada_test

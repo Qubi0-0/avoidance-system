@@ -71,17 +71,17 @@ void Avoidance::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_ms
         return;
     }
 
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
+    // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
     // Perform any necessary filtering on the cloud
-    cloud_filtered = groupPoints(cloud_transformed);
+    // cloud_filtered = groupPoints(cloud_transformed);
 
     pcl::PassThrough<pcl::PointXYZ> pass2;
-    pass2.setInputCloud(cloud_filtered);
+    pass2.setInputCloud(cloud_transformed);
     pass2.setFilterFieldName("z");
     pass2.setFilterLimits(3.0, 29); // Keep points at a distance of 0 to "range" meters
-    pass2.filter(*cloud_filtered);
+    pass2.filter(*cloud_transformed);
     PointCloudPtr cloud_upranged(new pcl::PointCloud<pcl::PointXYZ>);
-    cloud_upranged = cloud_filtered;
+    cloud_upranged = cloud_transformed;
 
     
     ros::Time end_time = ros::Time::now();

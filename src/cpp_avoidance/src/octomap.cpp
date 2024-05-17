@@ -7,19 +7,23 @@ geometry_msgs::Point AvoidanceOctomap::TARGET_POINT = geometry_msgs::Point();
 AvoidanceOctomap::AvoidanceOctomap(const ros::NodeHandle& nh)
     : nh_(nh), tf_listener_(tf_buffer_) {
     tf_buffer_.setUsingDedicatedThread(true);
-    cloud_sub_ = nh_.subscribe<sensor_msgs::PointCloud2>("/iris/camera/depth/points", 1, &AvoidanceOctomap::cloudCallback, this);
+
     pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, &AvoidanceOctomap::positionCallback, this);
-    goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>("drone_tracking/goal", 1);
     octree_sub_ = nh_.subscribe<octomap_msgs::Octomap>("octomap_binary", 1, &AvoidanceOctomap::octreeCallback, this);
+
+    goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>("drone_tracking/goal", 1);
+    
     TARGET_POINT.x = 0;
     TARGET_POINT.y = 180;
     TARGET_POINT.z = 10;
 }
 
-
 void AvoidanceOctomap::positionCallback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
-    drone_position_ = tf2::Vector3(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+    drone_position_.x = msg->pose.position.x;
+    drone_position_.y = msg->pose.position.y;
+    drone_position_.z = msg->pose.position.z;
 }
+
 void AvoidanceOctomap::octreeCallback(const octomap_msgs::Octomap::ConstPtr &msg) {
     octree_ = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(*msg));
     geometry_msgs::Point target_point;
@@ -33,11 +37,8 @@ void AvoidanceOctomap::octreeCallback(const octomap_msgs::Octomap::ConstPtr &msg
     point_msg.header.stamp = ros::Time::now();
     point_msg.header.frame_id = "odom";
     point_msg.point = nearest_point;
-    geometry_msgs::Point drone_position;
-    drone_position.x = drone_position_.getX();
-    drone_position.y = drone_position_.getY();
-    drone_position.z = drone_position_.getZ();
-    if (!has_reached_target(drone_position, point_msg.point)) {
+
+    if (!has_reached_target(drone_position_, point_msg.point)) {
         goal_pub_.publish(point_msg);
     }   
 }
@@ -49,24 +50,39 @@ bool AvoidanceOctomap::has_reached_target(const geometry_msgs::Point& current_po
     return distance < 0.1;
 }
 
-geometry_msgs::Point get_nearest_point_to_target(octomap::OcTree* octree, const geometry_msgs::Point& target_point) {
-    double min_distance = std::numeric_limits<double>::infinity();
+geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTree* octree, const geometry_msgs::Point& target_point) {
+    const double DIST = 10.0; 
+
+    // Calculate vector from drone to target
+    geometry_msgs::Point vector_to_target;
+    vector_to_target.x = target_point.x - drone_position_.x;
+    vector_to_target.y = target_point.y - drone_position_.y;
+    vector_to_target.z = target_point.z - drone_position_.z;
+
+    // Normalize the vector
+    double magnitude = sqrt(pow(vector_to_target.x, 2) +
+                            pow(vector_to_target.y, 2) +
+                            pow(vector_to_target.z, 2));
+    vector_to_target.x /= magnitude;
+    vector_to_target.y /= magnitude;
+    vector_to_target.z /= magnitude;
+
+    // Scale the vector by DIST
+    vector_to_target.x *= DIST;
+    vector_to_target.y *= DIST;
+    vector_to_target.z *= DIST;
+
+    // Calculate the nearest point
     geometry_msgs::Point nearest_point;
+    nearest_point.x = drone_position_.x + vector_to_target.x;
+    nearest_point.y = drone_position_.y + vector_to_target.y;
+    nearest_point.z = drone_position_.z + vector_to_target.z;
 
-    for(octomap::OcTree::leaf_iterator it = octree->begin_leafs(), end=octree->end_leafs(); it!= end; ++it) {
-        geometry_msgs::Point current_point;
-        current_point.x = it.getX();
-        current_point.y = it.getY();
-        current_point.z = it.getZ();
-
-        double distance = sqrt(pow(target_point.x - current_point.x, 2) +
-                               pow(target_point.y - current_point.y, 2) +
-                               pow(target_point.z - current_point.z, 2));
-
-        if (distance < min_distance) {
-            min_distance = distance;
-            nearest_point = current_point;
-        }
+    // Check if the point is in a free space in the octree
+    octomap::OcTreeNode* node = octree->search(nearest_point.x, nearest_point.y, nearest_point.z);
+    if (node != NULL && octree->isNodeOccupied(node)) {
+        // The point is in an occupied space, return a default point
+        return geometry_msgs::Point();
     }
 
     return nearest_point;

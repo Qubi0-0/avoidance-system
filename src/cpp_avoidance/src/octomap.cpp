@@ -12,7 +12,6 @@ AvoidanceOctomap::AvoidanceOctomap(const ros::NodeHandle& nh)
     octree_sub_ = nh_.subscribe<octomap_msgs::Octomap>("octomap_binary", 1, &AvoidanceOctomap::octreeCallback, this);
 
     goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>("drone_tracking/goal", 1);
-    
     TARGET_POINT.x = 0;
     TARGET_POINT.y = 180;
     TARGET_POINT.z = 10;
@@ -53,13 +52,11 @@ bool AvoidanceOctomap::has_reached_target(const geometry_msgs::Point& current_po
 geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTree* octree, const geometry_msgs::Point& target_point) {
     const double DIST = 10.0; 
 
-    // Calculate vector from drone to target
     geometry_msgs::Point vector_to_target;
     vector_to_target.x = target_point.x - drone_position_.x;
     vector_to_target.y = target_point.y - drone_position_.y;
     vector_to_target.z = target_point.z - drone_position_.z;
 
-    // Normalize the vector
     double magnitude = sqrt(pow(vector_to_target.x, 2) +
                             pow(vector_to_target.y, 2) +
                             pow(vector_to_target.z, 2));
@@ -67,25 +64,28 @@ geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTr
     vector_to_target.y /= magnitude;
     vector_to_target.z /= magnitude;
 
-    // Scale the vector by DIST
     vector_to_target.x *= DIST;
     vector_to_target.y *= DIST;
     vector_to_target.z *= DIST;
 
-    // Calculate the nearest point
     geometry_msgs::Point nearest_point;
     nearest_point.x = drone_position_.x + vector_to_target.x;
     nearest_point.y = drone_position_.y + vector_to_target.y;
     nearest_point.z = drone_position_.z + vector_to_target.z;
 
-    // Check if the point is in a free space in the octree
     octomap::OcTreeNode* node = octree->search(nearest_point.x, nearest_point.y, nearest_point.z);
     if (node != NULL && octree->isNodeOccupied(node)) {
         // The point is in an occupied space, return a default point
         return geometry_msgs::Point();
     }
 
-    return nearest_point;
+    // Check if the point is in a safe area
+    if (node != NULL && node->getOccupancy() < octree->getOccupancyThres()) {
+        return nearest_point;
+    }
+
+    // If the point is not in a safe area, return a default point
+    return geometry_msgs::Point();
 }
 
 int main(int argc, char** argv) {

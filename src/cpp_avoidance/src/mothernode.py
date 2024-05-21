@@ -5,7 +5,7 @@ from geometry_msgs.msg import PoseStamped, Twist
 from mavros_msgs.msg import State
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest
 import mavros_msgs.srv
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, Path
 import math
 from tf import transformations
 
@@ -49,7 +49,9 @@ class TakeOff:
             "/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
         
         self.pub_sub = rospy.Subscriber("potential_twist", Twist, self.twist_callback)
-        
+
+        self.path_subscriber = rospy.Subscriber("drone_tracking/path", Path, self.path_callback)
+
         self.max_hor_vel = rospy.ServiceProxy(
             '/mavros/param/set', mavros_msgs.srv.ParamSet)
 
@@ -62,9 +64,11 @@ class TakeOff:
         self.state_sub = rospy.Subscriber("mavros/state", State, callback=self.state_callback)
 
         self.avoid_position = PosePointRPY(1, 0, START_ALT,  0, 0, M_PI)
+        self.path = None
         self.vel = Twist()
         self.odom = Odometry()
         self.local_pose = PoseStamped()
+        self.waypoint = PoseStamped()
         self.rate = rospy.Rate(20)
         self.current_state = State()
         self.offb_set_mode = SetModeRequest()
@@ -97,6 +101,13 @@ class TakeOff:
 
     def state_callback(self, msg):
         self.current_state = msg
+
+    def path_callback(self, msg: Path):
+        if msg.poses is not None:
+            self.path = msg
+            for pose_stamped in self.path.poses: # type: ignore
+                self.pub_pose.publish(pose_stamped)
+                rospy.sleep(0.1)  # Sleep for a bit to ensure the drone has time to react
 
     def switch_to_offboard(self):
         if(self.current_state.mode != "OFFBOARD" and (rospy.Time.now() - self.last_req) > rospy.Duration(5)):
@@ -155,7 +166,22 @@ class TakeOff:
         return in_range 
 
     def avoidance(self):
-        self.pub_vel.publish(self.vel)
+        if not is_twist_empty(self.vel):
+            self.pub_vel.publish(self.vel)
+        elif self.path is not None:
+            self.pub_pose.publish(self.waypoint)
+        else:
+            rospy.loginfo("No control messages sent!")
+
+def is_twist_empty(twist):
+    return all([ 
+        twist.linear.x == 0,
+        twist.linear.y == 0,
+        twist.linear.z == 0,
+        twist.angular.x == 0,
+        twist.angular.y == 0,
+        twist.angular.z == 0,
+    ])
 
 if __name__ == '__main__':
     rospy.init_node('Mother_node') 

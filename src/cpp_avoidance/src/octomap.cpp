@@ -50,7 +50,10 @@ bool AvoidanceOctomap::has_reached_target(const geometry_msgs::Point& current_po
 }
 
 geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTree* octree, const geometry_msgs::Point& target_point) {
-    const double DIST = 10.0; 
+    const double DIST = 5.0; 
+    const double OFFSET = 3.0;  // The offset to use when trying to find a point to the side
+    const int MAX_TRIES = 50;   // Maximum number of attempts to find a free point
+    const double STEP_SIZE = 0.5; // Step size for searching around the target point
 
     geometry_msgs::Point vector_to_target;
     vector_to_target.x = target_point.x - drone_position_.x;
@@ -73,20 +76,45 @@ geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTr
     nearest_point.y = drone_position_.y + vector_to_target.y;
     nearest_point.z = drone_position_.z + vector_to_target.z;
 
-    octomap::OcTreeNode* node = octree->search(nearest_point.x, nearest_point.y, nearest_point.z);
-    if (node != NULL && octree->isNodeOccupied(node)) {
-        // The point is in an occupied space, return a default point
-        return geometry_msgs::Point();
+    for (int i = 0; i < MAX_TRIES; ++i) {
+        octomap::OcTreeNode* node = octree->search(nearest_point.x, nearest_point.y, nearest_point.z);
+        if (node != NULL && octree->isNodeOccupied(node) == false) {
+            // The point is in an unoccupied space, return it
+            return nearest_point;
+        }
+
+        // If the point is occupied or unknown, try neighboring points in a spiral pattern
+        for (double radius = STEP_SIZE; radius <= OFFSET * MAX_TRIES; radius += STEP_SIZE) {
+            for (double theta = 0; theta < 2 * M_PI; theta += M_PI / 8) {
+                geometry_msgs::Point side_point;
+                side_point.x = nearest_point.x + radius * cos(theta);
+                side_point.y = nearest_point.y + radius * sin(theta);
+                side_point.z = nearest_point.z; // Assuming 2D search for simplicity, can be expanded to 3D
+
+                octomap::OcTreeNode* side_node = octree->search(side_point.x, side_point.y, side_point.z);
+                if (side_node != NULL && octree->isNodeOccupied(side_node) == false) {
+                    // The side point is in an unoccupied space, return it
+                    return side_point;
+                }
+            }
+        }
+
+        // Expand the search radius if no free point is found
+        nearest_point.x += vector_to_target.x * (i + 1);
+        nearest_point.y += vector_to_target.y * (i + 1);
+        nearest_point.z += vector_to_target.z * (i + 1);
     }
 
-    // Check if the point is in a safe area
-    if (node != NULL && node->getOccupancy() < octree->getOccupancyThres()) {
-        return nearest_point;
-    }
-
-    // If the point is not in a safe area, return a default point
-    return geometry_msgs::Point();
+    // If no free point could be found after MAX_TRIES, return a default point
+    geometry_msgs::Point default_point;
+    default_point.x = NAN;
+    default_point.y = NAN;
+    default_point.z = NAN;
+    return default_point;
 }
+
+
+
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "avoidance_octomap_node");

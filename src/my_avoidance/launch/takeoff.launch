@@ -1,0 +1,3 @@
+<launch>
+    <node name="takeoff_node" pkg="avoidance" type="takeoff_node.py" output="screen"> </node>
+</launch>

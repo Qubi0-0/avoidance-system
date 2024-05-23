@@ -1,0 +1,9 @@
+digraph G {
+"odom" -> "odom_ned"[label="Broadcaster: /mavros\nAverage rate: 10000.000 Hz\nMost recent transform: 0.000 ( 759.629 sec old)\nBuffer length: 0.000 sec\n"];
+"drone_link" -> "camera_link"[label="Broadcaster: /transform_publisher_node\nAverage rate: 10.233 Hz\nMost recent transform: 759.627 ( 0.002 sec old)\nBuffer length: 4.300 sec\n"];
+"odom" -> "drone_link"[label="Broadcaster: /transform_publisher_node\nAverage rate: 10.233 Hz\nMost recent transform: 759.627 ( 0.002 sec old)\nBuffer length: 4.300 sec\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 759.629"[ shape=plaintext ] ;
+ }->"odom";
+}

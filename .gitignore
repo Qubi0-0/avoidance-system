@@ -24,3 +24,6 @@
 .idea/
 *.sublime-workspace
 *.swp
+
+# Test pkg for droniada
+/src/droniada_test

@@ -8,12 +8,9 @@ import mavros_msgs.srv
 from nav_msgs.msg import Odometry
 from tf import transformations
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
+import numpy as np
 
-
-START_ALT = 8 # alt for drone flight
 M_PI = 3.14159265359
-TARGET_ANGL = 1 * (M_PI / 180.0)
-POS_TRESHOLD = 0.3
 
 class TakeOff:
     def __init__(self):
@@ -54,6 +51,7 @@ class TakeOff:
         self.arm_cmd.value = True
         self.last_req = rospy.Time.now()
         self.take_off_flag = False
+        self.flight_time = np.array()
 
     def positionCallback(self, msg: PoseStamped):
         self.local_pose.pose.position.x = msg.pose.position.x
@@ -107,12 +105,15 @@ class TakeOff:
                 self.last_req = rospy.Time.now()
 
     def spin_once(self):
+        start_time = rospy.Time.now()
         if self.vel is not None:
             self.pub_vel.publish(self.vel)
         elif self.waypoint is not None:
             self.pub_pose.publish(self.waypoint)
         else:
             rospy.loginfo("No control messages sent!")
+        duration = (start_time - rospy.Time.now()).to_sec()
+        self.flight_time.append(duration)
 
 
 if __name__ == '__main__':
@@ -135,5 +136,7 @@ if __name__ == '__main__':
     while(not rospy.is_shutdown()):
         avoider.switch_to_offboard()
         avoider.spin_once()
+        flight_duration = sum(avoider.flight_time)
+        rospy.loginfo(f"flight duration: {flight_duration}")
 
             

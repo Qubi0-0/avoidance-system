@@ -74,7 +74,9 @@ geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTr
     geometry_msgs::Point nearest_point;
     nearest_point.x = drone_position_.x + vector_to_target.x;
     nearest_point.y = drone_position_.y + vector_to_target.y;
-    nearest_point.z = drone_position_.z + vector_to_target.z;
+    // nearest_point.z = drone_position_.z + vector_to_target.z;
+    nearest_point.z = 10;
+
 
     for (int i = 0; i < MAX_TRIES; ++i) {
         octomap::OcTreeNode* node = octree->search(nearest_point.x, nearest_point.y, nearest_point.z);
@@ -89,7 +91,7 @@ geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTr
                 geometry_msgs::Point side_point;
                 side_point.x = nearest_point.x + radius * cos(theta);
                 side_point.y = nearest_point.y + radius * sin(theta);
-                side_point.z = nearest_point.z; // Assuming 2D search for simplicity, can be expanded to 3D
+                side_point.z = nearest_point.z + radius * sin(theta); 
 
                 octomap::OcTreeNode* side_node = octree->search(side_point.x, side_point.y, side_point.z);
                 if (side_node != NULL && octree->isNodeOccupied(side_node) == false) {
@@ -107,9 +109,9 @@ geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTr
 
     // If no free point could be found after MAX_TRIES, return a default point
     geometry_msgs::Point default_point;
-    default_point.x = NAN;
-    default_point.y = NAN;
-    default_point.z = NAN;
+    default_point.x = drone_position_.x;
+    default_point.y = drone_position_.y;
+    default_point.z = drone_position_.z;
     return default_point;
 }
 

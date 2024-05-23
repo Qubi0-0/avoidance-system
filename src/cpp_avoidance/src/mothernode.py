@@ -106,19 +106,7 @@ class TakeOff:
             
                 self.last_req = rospy.Time.now()
 
-    def publish_takeoff_point(self):
-        start_pose =  PoseStamped()
-        start_pose.pose.position.x = self.local_pose.pose.position.x
-        start_pose.pose.position.y = self.local_pose.pose.position.x
-        start_pose.pose.position.z = START_ALT
-
-        start_pose.pose.orientation.x = self.local_pose.pose.orientation.x
-        start_pose.pose.orientation.y = self.local_pose.pose.orientation.y
-        start_pose.pose.orientation.z = self.local_pose.pose.orientation.z
-        start_pose.pose.orientation.w = self.local_pose.pose.orientation.w
-        self.pub_pose.publish(start_pose)
-
-    def avoidance(self):
+    def spin_once(self):
         if self.vel is not None:
             self.pub_vel.publish(self.vel)
         elif self.waypoint is not None:
@@ -130,7 +118,7 @@ class TakeOff:
 if __name__ == '__main__':
     rospy.init_node('Mother_node') 
     avoider = TakeOff()
-    rospy.loginfo("Takeoff node initiated")
+    rospy.loginfo("Control node initiated")
 
     while(not rospy.is_shutdown() and not avoider.current_state.connected):
         avoider.rate.sleep()
@@ -138,20 +126,14 @@ if __name__ == '__main__':
     for i in range(10):   
         if(rospy.is_shutdown()):
             break
-        avoider.publish_takeoff_point()
         avoider.rate.sleep()
 
     avoider.offb_set_mode.custom_mode = 'OFFBOARD'
     avoider.arm_cmd.value = True
 
     avoider.last_req = rospy.Time.now()  
-    rospy.loginfo("Preparing to takeoff")
     while(not rospy.is_shutdown()):
         avoider.switch_to_offboard()
-        if not avoider.take_off_flag:
-            avoider.publish_takeoff_point()
-        else: 
-            avoider.avoidance()
-        if avoider.local_pose.pose.position.z >= START_ALT - POS_TRESHOLD:
-            avoider.take_off_flag = True
+        avoider.spin_once()
+
             

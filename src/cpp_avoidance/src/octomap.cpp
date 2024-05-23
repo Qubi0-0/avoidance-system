@@ -13,7 +13,7 @@ AvoidanceOctomap::AvoidanceOctomap(const ros::NodeHandle& nh)
 
     goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>("drone_tracking/goal", 1);
     TARGET_POINT.x = 0;
-    TARGET_POINT.y = 180;
+    TARGET_POINT.y = 90;
     TARGET_POINT.z = 10;
 }
 

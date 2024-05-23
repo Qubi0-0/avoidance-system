@@ -5,103 +5,41 @@
 geometry_msgs::Point AvoidanceOctomap::TARGET_POINT = geometry_msgs::Point();
 
 AvoidanceOctomap::AvoidanceOctomap(const ros::NodeHandle& nh)
-    : nh_(nh), octree_(0.1), tf_listener_(tf_buffer_) {
+    : nh_(nh), tf_listener_(tf_buffer_) {
     tf_buffer_.setUsingDedicatedThread(true);
-    cloud_sub_ = nh_.subscribe<sensor_msgs::PointCloud2>("/iris/camera/depth/points", 1, &AvoidanceOctomap::cloudCallback, this);
+
     pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, &AvoidanceOctomap::positionCallback, this);
+    octree_sub_ = nh_.subscribe<octomap_msgs::Octomap>("octomap_binary", 1, &AvoidanceOctomap::octreeCallback, this);
+
     goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>("drone_tracking/goal", 1);
-    octomap_pub_ = nh_.advertise<octomap_msgs::Octomap>("/output/octomap_topic", 1);
     TARGET_POINT.x = 0;
     TARGET_POINT.y = 180;
     TARGET_POINT.z = 10;
 }
 
-
 void AvoidanceOctomap::positionCallback(const geometry_msgs::PoseStamped::ConstPtr& msg) {
-    drone_position_ = tf2::Vector3(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+    drone_position_.x = msg->pose.position.x;
+    drone_position_.y = msg->pose.position.y;
+    drone_position_.z = msg->pose.position.z;
 }
 
-void AvoidanceOctomap::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg) {
-    pcl::PCLPointCloud2 pcl_pc2;
-    pcl_conversions::toPCL(*cloud_msg, pcl_pc2);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-    pcl::fromPCLPointCloud2(pcl_pc2, *cloud);
-
-    // Downsample the cloud by selecting every Nth point
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downsampled(new pcl::PointCloud<pcl::PointXYZ>());
-    for (int i = 0; i < cloud->points.size(); i += 100) {
-        cloud_downsampled->points.push_back(cloud->points[i]);
-    }
-
-    pcl::PassThrough<pcl::PointXYZ> pass;
-    pass.setInputCloud(cloud_downsampled);
-    pass.setFilterFieldName("z");
-    pass.setFilterLimits(0.0, 30); 
-    pass.filter(*cloud_downsampled);
-
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_downranged(new pcl::PointCloud<pcl::PointXYZ>);
-    cloud_downranged = cloud_downsampled;
-
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_transformed(new pcl::PointCloud<pcl::PointXYZ>());
-    geometry_msgs::TransformStamped transform_stamped;
-    try {
-        if (tf_buffer_.canTransform(TARGET_FRAME, SOURCE_FRAME, ros::Time(0), ros::Duration(1.0))) {
-            transform_stamped = tf_buffer_.lookupTransform(TARGET_FRAME, SOURCE_FRAME, ros::Time(0));
-            pcl_ros::transformPointCloud(*cloud_downranged, *cloud_transformed, transform_stamped.transform);
-        } else {
-            ROS_WARN("Transform from 'odom' to 'camera_link' not available");
-            return;
-        }
-    } catch (tf2::TransformException& ex) {
-        ROS_WARN("%s", ex.what());
-        return;
-    }
-
-    pcl::PassThrough<pcl::PointXYZ> pass2;
-    pass2.setInputCloud(cloud_transformed);
-    pass2.setFilterFieldName("z");
-    pass2.setFilterLimits(3.0, 29); 
-    pass2.filter(*cloud_transformed);
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_upranged(new pcl::PointCloud<pcl::PointXYZ>);
-    cloud_upranged = cloud_transformed;
-
-
-    octomap::Pointcloud octomap_cloud;
-    for (const auto& point : cloud_upranged->points) {
-        octomap_cloud.push_back(point.x, point.y, point.z);
-    }
-
-    octree_.insertPointCloud(octomap_cloud, octomap::point3d(0, 0, 0));
-    octree_.updateInnerOccupancy();
-    octree_.toMaxLikelihood();
-
+void AvoidanceOctomap::octreeCallback(const octomap_msgs::Octomap::ConstPtr &msg) {
+    octree_ = dynamic_cast<octomap::OcTree*>(octomap_msgs::msgToMap(*msg));
     geometry_msgs::Point target_point;
     target_point.x = TARGET_POINT.x;  
     target_point.y = TARGET_POINT.y;  
     target_point.z = TARGET_POINT.z;  
 
-    geometry_msgs::Point nearest_point = get_nearest_point_to_target(&octree_);
+    geometry_msgs::Point nearest_point = get_nearest_point_to_target(octree_, target_point);
 
     geometry_msgs::PointStamped point_msg;
     point_msg.header.stamp = ros::Time::now();
     point_msg.header.frame_id = "odom";
     point_msg.point = nearest_point;
-    geometry_msgs::Point drone_position;
-    drone_position.x = drone_position_.getX();
-    drone_position.y = drone_position_.getY();
-    drone_position.z = drone_position_.getZ();
-    if (!has_reached_target(drone_position, point_msg.point)) {
+
+    if (!has_reached_target(drone_position_, point_msg.point)) {
         goal_pub_.publish(point_msg);
-    }
-
-
-    octomap_msgs::Octomap octomap_msg;
-    octomap_msg.header.stamp = ros::Time::now();
-    octomap_msg.header.frame_id = "odom";  
-    octomap_msgs::binaryMapToMsg(octree_, octomap_msg);
-
-    octomap_pub_.publish(octomap_msg);
-
+    }   
 }
 
 bool AvoidanceOctomap::has_reached_target(const geometry_msgs::Point& current_position, const geometry_msgs::Point& target_point) {
@@ -111,42 +49,74 @@ bool AvoidanceOctomap::has_reached_target(const geometry_msgs::Point& current_po
     return distance < 0.1;
 }
 
-geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTree* octree) {
-    double min_distance = std::numeric_limits<double>::infinity();
+geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTree* octree, const geometry_msgs::Point& target_point) {
+    const double DIST = 5.0; 
+    const double OFFSET = 3.0;  // The offset to use when trying to find a point to the side
+    const int MAX_TRIES = 50;   // Maximum number of attempts to find a free point
+    const double STEP_SIZE = 0.5; // Step size for searching around the target point
+
+    geometry_msgs::Point vector_to_target;
+    vector_to_target.x = target_point.x - drone_position_.x;
+    vector_to_target.y = target_point.y - drone_position_.y;
+    vector_to_target.z = target_point.z - drone_position_.z;
+
+    double magnitude = sqrt(pow(vector_to_target.x, 2) +
+                            pow(vector_to_target.y, 2) +
+                            pow(vector_to_target.z, 2));
+    vector_to_target.x /= magnitude;
+    vector_to_target.y /= magnitude;
+    vector_to_target.z /= magnitude;
+
+    vector_to_target.x *= DIST;
+    vector_to_target.y *= DIST;
+    vector_to_target.z *= DIST;
+
     geometry_msgs::Point nearest_point;
+    nearest_point.x = drone_position_.x + vector_to_target.x;
+    nearest_point.y = drone_position_.y + vector_to_target.y;
+    // nearest_point.z = drone_position_.z + vector_to_target.z;
+    nearest_point.z = 10;
 
-    for(octomap::OcTree::leaf_iterator it = octree->begin_leafs(), end=octree->end_leafs(); it!= end; ++it) {
-        geometry_msgs::Point current_point;
-        current_point.x = it.getX();
-        current_point.y = it.getY();
-        current_point.z = it.getZ();
 
-        double distance = sqrt(pow(TARGET_POINT.x - current_point.x, 2) +
-                               pow(TARGET_POINT.y - current_point.y, 2) +
-                               pow(TARGET_POINT.z - current_point.z, 2));
-
-        if (distance < min_distance) {
-            min_distance = distance;
-            nearest_point = current_point;
+    for (int i = 0; i < MAX_TRIES; ++i) {
+        octomap::OcTreeNode* node = octree->search(nearest_point.x, nearest_point.y, nearest_point.z);
+        if (node != NULL && octree->isNodeOccupied(node) == false) {
+            // The point is in an unoccupied space, return it
+            return nearest_point;
         }
+
+        // If the point is occupied or unknown, try neighboring points in a spiral pattern
+        for (double radius = STEP_SIZE; radius <= OFFSET * MAX_TRIES; radius += STEP_SIZE) {
+            for (double theta = 0; theta < 2 * M_PI; theta += M_PI / 8) {
+                geometry_msgs::Point side_point;
+                side_point.x = nearest_point.x + radius * cos(theta);
+                side_point.y = nearest_point.y + radius * sin(theta);
+                side_point.z = nearest_point.z + radius * sin(theta); 
+
+                octomap::OcTreeNode* side_node = octree->search(side_point.x, side_point.y, side_point.z);
+                if (side_node != NULL && octree->isNodeOccupied(side_node) == false) {
+                    // The side point is in an unoccupied space, return it
+                    return side_point;
+                }
+            }
+        }
+
+        // Expand the search radius if no free point is found
+        nearest_point.x += vector_to_target.x * (i + 1);
+        nearest_point.y += vector_to_target.y * (i + 1);
+        nearest_point.z += vector_to_target.z * (i + 1);
     }
 
-
-    geometry_msgs::Point midpoint;
-    midpoint.x = nearest_point.x + 0.5 * (drone_position_.x() - nearest_point.x);
-    midpoint.y = nearest_point.y + 0.5 * (drone_position_.y() - nearest_point.y);
-    midpoint.z = nearest_point.z + 0.5 * (drone_position_.z() - nearest_point.z);
-\
-    octomap::OcTreeNode* result = octree->search(midpoint.x, midpoint.y, midpoint.z);
-
-    if (result == NULL) {
-        // The midpoint is not in the octree, handle this situation
-        // For example, set midpoint to nearest_point
-        midpoint = nearest_point;
-    }
-
-    return midpoint;
+    // If no free point could be found after MAX_TRIES, return a default point
+    geometry_msgs::Point default_point;
+    default_point.x = drone_position_.x;
+    default_point.y = drone_position_.y;
+    default_point.z = drone_position_.z;
+    return default_point;
 }
+
+
+
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "avoidance_octomap_node");

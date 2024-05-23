@@ -6,36 +6,14 @@ from mavros_msgs.msg import State
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest
 import mavros_msgs.srv
 from nav_msgs.msg import Odometry
-import math
 from tf import transformations
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 
 START_ALT = 8 # alt for drone flight
 M_PI = 3.14159265359
 TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.3
-
-
-class PosePointRPY:
-    def __init__(self, x, y, z, roll, pitch, yaw):
-        
-        self.roll = roll
-        self.pitch = pitch
-        self.yaw = yaw
-
-        self.pos = PoseStamped()
-        self.pos.pose.position.x = x
-        self.pos.pose.position.y = y
-        self.pos.pose.position.z = z
-        rollRad = math.radians(roll)
-        pitchRad = math.radians(pitch)
-        yawRad = math.radians(yaw)
-        quaternion = transformations.quaternion_from_euler(rollRad, pitchRad, yawRad)
-        self.pos.pose.orientation.x = quaternion[0]
-        self.pos.pose.orientation.y = quaternion[1]
-        self.pos.pose.orientation.z = quaternion[2]
-        self.pos.pose.orientation.w = quaternion[3]
-
 
 class TakeOff:
     def __init__(self):
@@ -49,7 +27,10 @@ class TakeOff:
             "/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
         
         self.pub_sub = rospy.Subscriber("potential_twist", Twist, self.twist_callback)
-        
+
+        self.waypoint_sub = rospy.Subscriber(
+            "drone_tracking/waypoint", PoseStamped, self.waypointCallback)
+
         self.max_hor_vel = rospy.ServiceProxy(
             '/mavros/param/set', mavros_msgs.srv.ParamSet)
 
@@ -61,10 +42,10 @@ class TakeOff:
 
         self.state_sub = rospy.Subscriber("mavros/state", State, callback=self.state_callback)
 
-        self.avoid_position = PosePointRPY(1, 0, START_ALT,  0, 0, M_PI)
-        self.vel = Twist()
+        self.vel = None
         self.odom = Odometry()
         self.local_pose = PoseStamped()
+        self.waypoint = None
         self.rate = rospy.Rate(20)
         self.current_state = State()
         self.offb_set_mode = SetModeRequest()
@@ -73,15 +54,6 @@ class TakeOff:
         self.arm_cmd.value = True
         self.last_req = rospy.Time.now()
         self.take_off_flag = False
-
-    def poseStamped_to_rpy(self, source: PoseStamped):
-        rpy = transformations.euler_from_quaternion([source.pose.orientation.x, source.pose.orientation.y,
-                    source.pose.orientation.z, source.pose.orientation.w])
-
-        result = PosePointRPY(source.pose.position.x, source.pose.position.y, source.pose.position.z,
-                    rpy[0], rpy[1], rpy[2])        
-
-        return result
 
     def positionCallback(self, msg: PoseStamped):
         self.local_pose.pose.position.x = msg.pose.position.x
@@ -92,7 +64,30 @@ class TakeOff:
                     msg.pose.orientation.z,msg.pose.orientation.w])
         self.local_yaw = rpy[2]
 
+    def waypointCallback(self, msg: PoseStamped):
+        self.waypoint = PoseStamped()
+        self.waypoint.pose.position.x = msg.pose.position.x
+        self.waypoint.pose.position.y = msg.pose.position.y
+        self.waypoint.pose.position.z = msg.pose.position.z
+        # Convert quaternion to Euler angles
+        orientation_q = msg.pose.orientation
+        orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
+        (roll, pitch, yaw) = euler_from_quaternion(orientation_list)
+
+        # Subtract 90 degrees from yaw
+        yaw += M_PI/2
+
+        # Convert back to quaternion
+        new_orientation_q = quaternion_from_euler(roll, pitch, yaw)
+
+        # Assign the new orientation to the waypoint
+        self.waypoint.pose.orientation.x = new_orientation_q[0]
+        self.waypoint.pose.orientation.y = new_orientation_q[1]
+        self.waypoint.pose.orientation.z = new_orientation_q[2]
+        self.waypoint.pose.orientation.w = new_orientation_q[3]
+        
     def twist_callback(self, msg: Twist):
+        self.vel = Twist()
         self.vel = msg
 
     def state_callback(self, msg):
@@ -111,56 +106,19 @@ class TakeOff:
             
                 self.last_req = rospy.Time.now()
 
-    def publish_pose(self, goal: PosePointRPY):
-        pose = PoseStamped()
-        pose.header.stamp = rospy.Time.now()
-        pose.pose.position.x = goal.pos.pose.position.x
-        pose.pose.position.y = goal.pos.pose.position.y
-        pose.pose.position.z = goal.pos.pose.position.z
-        pose.pose.orientation.x = goal.pos.pose.orientation.x
-        pose.pose.orientation.y = goal.pos.pose.orientation.y
-        pose.pose.orientation.z = goal.pos.pose.orientation.z
-        pose.pose.orientation.w = goal.pos.pose.orientation.w
-        self.pub_pose.publish(pose)
+    def spin_once(self):
+        if self.vel is not None:
+            self.pub_vel.publish(self.vel)
+        elif self.waypoint is not None:
+            self.pub_pose.publish(self.waypoint)
+        else:
+            rospy.loginfo("No control messages sent!")
 
-    def publish_takeoff_point(self):
-        start_pose =  PoseStamped()
-        start_pose.pose.position.x = self.local_pose.pose.position.x
-        start_pose.pose.position.y = self.local_pose.pose.position.x
-        start_pose.pose.position.z = START_ALT
-
-        start_pose.pose.orientation.x = self.local_pose.pose.orientation.x
-        start_pose.pose.orientation.y = self.local_pose.pose.orientation.y
-        start_pose.pose.orientation.z = self.local_pose.pose.orientation.z
-        start_pose.pose.orientation.w = self.local_pose.pose.orientation.w
-        self.pub_pose.publish(start_pose)
-
-    def position_check(self, goal: PosePointRPY):
-        dx = self.local_pose.pose.position.x - goal.pos.pose.position.x
-        dy = self.local_pose.pose.position.y - goal.pos.pose.position.y
-        dz = self.local_pose.pose.position.z - goal.pos.pose.position.z
-        dist2 = dx**2 + dy**2 + dz**2
-        if dist2 > POS_TRESHOLD**2:
-            return False
-
-        curr_orient = self.local_pose.pose.orientation
-        curr_euler = transformations.euler_from_quaternion(
-            [curr_orient.x, curr_orient.y, curr_orient.z, curr_orient.w])
-        cr = abs(curr_euler[0] - math.radians(goal.roll))< TARGET_ANGL
-        cp = abs(curr_euler[1] - math.radians(goal.pitch)) < TARGET_ANGL
-        cy = abs(curr_euler[2] - math.radians(goal.yaw)) < TARGET_ANGL
-        
-        in_range = cr and cp and cy
-
-        return in_range 
-
-    def avoidance(self):
-        self.pub_vel.publish(self.vel)
 
 if __name__ == '__main__':
     rospy.init_node('Mother_node') 
     avoider = TakeOff()
-    rospy.loginfo("Takeoff node initiated")
+    rospy.loginfo("Control node initiated")
 
     while(not rospy.is_shutdown() and not avoider.current_state.connected):
         avoider.rate.sleep()
@@ -168,20 +126,14 @@ if __name__ == '__main__':
     for i in range(10):   
         if(rospy.is_shutdown()):
             break
-        avoider.publish_takeoff_point()
         avoider.rate.sleep()
 
     avoider.offb_set_mode.custom_mode = 'OFFBOARD'
     avoider.arm_cmd.value = True
 
     avoider.last_req = rospy.Time.now()  
-    rospy.loginfo("Preparing to takeoff")
     while(not rospy.is_shutdown()):
         avoider.switch_to_offboard()
-        if not avoider.take_off_flag:
-            avoider.publish_takeoff_point()
-        else: 
-            avoider.avoidance()
-        if avoider.local_pose.pose.position.z >= START_ALT - POS_TRESHOLD:
-            avoider.take_off_flag = True
+        avoider.spin_once()
+
             

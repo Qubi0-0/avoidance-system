@@ -14,7 +14,7 @@
 #include <pcl/point_types.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_sensor_msgs/tf2_sensor_msgs.h>
-#include <tf2/LinearMath/Vector3.h> // Add this line
+#include <tf2/LinearMath/Vector3.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <string.h>
 
@@ -28,21 +28,21 @@ public:
 
     AvoidanceOctomap(const ros::NodeHandle& nh);
 
-    void cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
     void positionCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
+    void octreeCallback(const octomap_msgs::Octomap::ConstPtr &msg);
     bool has_reached_target(const geometry_msgs::Point& current_position, const geometry_msgs::Point& target_point);
-    geometry_msgs::Point get_nearest_point_to_target(octomap::OcTree* octree);
+    geometry_msgs::Point get_nearest_point_to_target(octomap::OcTree* octree, const geometry_msgs::Point& target_point);
     
 private:
     ros::NodeHandle nh_;
     ros::Subscriber cloud_sub_;
     ros::Subscriber pose_sub_;
-    ros::Publisher octomap_pub_;
+    ros::Subscriber octree_sub_;
     ros::Publisher goal_pub_;
-    octomap::OcTree octree_;
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::TransformListener tf_listener_;
-    tf2::Vector3 drone_position_;
+    geometry_msgs::Point drone_position_;
+    octomap::OcTree* octree_;
 };
 
 #endif // AVOIDANCE_OCTOMAP_H

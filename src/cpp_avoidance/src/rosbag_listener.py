@@ -1,5 +1,4 @@
 import rospy
-import rosbag
 import time
 
 class MessageListener:
@@ -30,7 +29,7 @@ def main():
         rospy.Subscriber(topic, rospy.AnyMsg, listener.callback)
 
     while not rospy.is_shutdown():
-        time.sleep(1)  # wait for messages
+        time.sleep(1) 
         total_average_period = 0.0
         valid_topics_count = 0
         for topic, listener in listeners.items():

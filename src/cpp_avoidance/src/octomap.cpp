@@ -74,8 +74,8 @@ geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTr
     geometry_msgs::Point nearest_point;
     nearest_point.x = drone_position_.x + vector_to_target.x;
     nearest_point.y = drone_position_.y + vector_to_target.y;
-    // nearest_point.z = drone_position_.z + vector_to_target.z;
-    nearest_point.z = 10;
+    nearest_point.z = drone_position_.z + vector_to_target.z;
+    // nearest_point.z = 10;
 
 
     for (int i = 0; i < MAX_TRIES; ++i) {

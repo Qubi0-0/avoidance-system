@@ -69,6 +69,6 @@ target_link_libraries(lidar_node
   # include/avoidance
 )
 
-catkin_install_python(PROGRAMS src/mothernode.py
+catkin_install_python(PROGRAMS src/mothernode.py src/rosbag_listener.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

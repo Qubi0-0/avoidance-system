@@ -5,10 +5,9 @@ from geometry_msgs.msg import PoseStamped, Twist
 from mavros_msgs.msg import State
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest
 import mavros_msgs.srv
-from nav_msgs.msg import Odometry
+from nav_msgs.msg import Odometry, Path
 from tf import transformations
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
-import numpy as np
 
 M_PI = 3.14159265359
 
@@ -24,6 +23,8 @@ class TakeOff:
             "/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=1)
         
         self.pub_sub = rospy.Subscriber("potential_twist", Twist, self.twist_callback)
+
+        self.path_publisher = rospy.Publisher('/drone_path', Path, queue_size=10)
 
         self.waypoint_sub = rospy.Subscriber(
             "drone_tracking/waypoint", PoseStamped, self.waypointCallback)
@@ -51,7 +52,9 @@ class TakeOff:
         self.arm_cmd.value = True
         self.last_req = rospy.Time.now()
         self.take_off_flag = False
-        self.flight_time = np.array()
+        self.flight_time = []
+        self.path = Path()
+        self.path.header.frame_id = 'odom'
 
     def positionCallback(self, msg: PoseStamped):
         self.local_pose.pose.position.x = msg.pose.position.x
@@ -61,6 +64,9 @@ class TakeOff:
         rpy = transformations.euler_from_quaternion([msg.pose.orientation.x,msg.pose.orientation.y,
                     msg.pose.orientation.z,msg.pose.orientation.w])
         self.local_yaw = rpy[2]
+
+        self.path.poses.append(msg)
+        self.path_publisher.publish(self.path)
 
     def waypointCallback(self, msg: PoseStamped):
         self.waypoint = PoseStamped()

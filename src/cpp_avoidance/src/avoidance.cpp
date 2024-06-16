@@ -18,7 +18,7 @@ Avoidance::Avoidance(const ros::NodeHandle& nh) : nh_(nh), tf_listener_(tf_buffe
     vel_pub_ = nh_.advertise<geometry_msgs::Twist>("potential_twist", 1);
     marker_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("visualization_marker_array", 1);
 
-    target_position_ = {0, 90, FLIGHT_ALT};
+    target_position_ = {0, 180, FLIGHT_ALT};
     
     yaw_angle_ = M_PI;
     last_published_ = ros::Time::now();

@@ -22,7 +22,7 @@ class MessageListener:
 
 def main():
     rospy.init_node('message_listener', anonymous=True)
-    topics = ["/octomap_binary", "/drone_tracking/waypoint"]
+    topics = ["/octomap_binary"]
     listeners = {topic: MessageListener(topic) for topic in topics}
 
     for topic, listener in listeners.items():

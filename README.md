@@ -27,7 +27,7 @@ Message potienital\_twist represents result of calculations for PFM. It shows ho
 
 To represent how it works, there are few images obtained after testing. 
 
-# Rviz Visualization 
+# Rviz Visualization of a working system
 
 ![Rviz Visualization ](https://github.com/Qubi0-0/avoidance-system/blob/main/Images/pointcloudgazeborviz-after.png)
 
@@ -39,9 +39,29 @@ To represent how it works, there are few images obtained after testing.
 
 ![!\[Rviz Visualization of working system\]{Images/pfa-rviz-path.png}](https://github.com/Qubi0-0/avoidance-system/blob/main/Images/pfa-rviz-path.png)
 
-## Contributing
+Octomap is used only for better visualization of trajectory.
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+## How to use
+
+No special Roslaunches are needed to make it work. Make sure to takeoff independently from avoidance system. 
+
+All ususal steps for ros packages such as 
+
+```bash
+source /opt/ros/noetic/setup.bash
+``` 
+Are still needed.
+
+```bash
+rosrun cpp_avoidance avoidance_node 
+```
+
+and in new terminal:
+
+```bash
+rosrun cpp_avoidance mother_node
+```
+
 
 ## License
 

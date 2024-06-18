@@ -41,14 +41,14 @@ To represent how it works, there are few images obtained after testing.
 
 Octomap is used only for better visualization of trajectory.
 
-## How to use
+# How to use
 
 No special Roslaunches are needed to make it work. Make sure to takeoff independently from avoidance system. 
 
-# Before start 
+## Before start 
 make sure that subscribed topic from drone is correctly set. It might differ from avaiable version here.
 
-# Running system
+## Running system
 
 1. All ususal steps for ros packages such as 
 
@@ -70,6 +70,6 @@ rosrun cpp_avoidance mother_node
 ```
 
 
-## License
+# License
 
 [MIT](https://choosealicense.com/licenses/mit/)

@@ -256,14 +256,6 @@ int main(int argc, char** argv) {
     while (ros::ok()) {
         ros::spinOnce();
         avoidance.potentialFieldsAvoidance();
-        if (avoidance.cloud_count > 0) {
-        auto mean_cloud_time = avoidance.mean_cloud_time.toSec() / avoidance.cloud_count;
-        ROS_INFO("Average time taken by CloudCallback: %f seconds", mean_cloud_time);
-    }
-        if (avoidance.DBSCAN_count > 0) {
-        auto mean_db_time = avoidance.mean_DBSCAN_time.toSec() / avoidance.DBSCAN_count;
-        ROS_INFO("Average time taken by DBSCAN: %f seconds", mean_db_time);
-    }
     }
 
     return 0;

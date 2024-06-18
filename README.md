@@ -29,7 +29,7 @@ To represent how it works, there are few images obtained after testing.
 
 # Rviz Visualization 
 
-![!\[Path Visualization\]{Images/pointcloudgazeborviz-after.png}](https://github.com/Qubi0-0/avoidance-system/blob/main/Images/pfa-qg-path.png)
+![Rviz Visualization ](https://github.com/Qubi0-0/avoidance-system/blob/main/Images/pointcloudgazeborviz-after.png)
 
 # Path Visualization in QgroundControl
 

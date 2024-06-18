@@ -1,6 +1,6 @@
 # UAV Avodiance system based on Potential Fields Method
 
-This is a ROS (Robot Operating System) project that uses stereovision camera for collision avoidance.
+This is a ROS (Robot Operating System) project that uses stereovision camera for collision avoidance. The project was developed for my thesis project.
 
 ## Files
 
@@ -45,18 +45,25 @@ Octomap is used only for better visualization of trajectory.
 
 No special Roslaunches are needed to make it work. Make sure to takeoff independently from avoidance system. 
 
-All ususal steps for ros packages such as 
+# Before start 
+make sure that subscribed topic from drone is correctly set. It might differ from avaiable version here.
+
+# Running system
+
+1. All ususal steps for ros packages such as 
 
 ```bash
 source /opt/ros/noetic/setup.bash
 ``` 
 Are still needed.
 
+2. Start `avoidance_node`, responsible for computing results from depth camera.
+
 ```bash
-rosrun cpp_avoidance avoidance_node 
+rosrun cpp_avoidance avoidance_node  
 ```
 
-and in new terminal:
+3. and in new terminal start `mother_node`, responisble for decision-making.
 
 ```bash
 rosrun cpp_avoidance mother_node

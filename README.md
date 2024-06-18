@@ -1,28 +1,43 @@
-# Project Title
+# UAV Avodiance system based on Potential Fields Method
 
-This is a ROS (Robot Operating System) project that uses depth and RGB images from a camera to perform certain operations.
+This is a ROS (Robot Operating System) project that uses stereovision camera for collision avoidance.
 
 ## Files
 
-- `depth_object_node.py`: This script subscribes to the depth and RGB images from the camera. It splits the depth image into sub-matrices, calculates the mean of each sub-matrix, and displays the RGB image with the mean values overlaid.
-- `avoidance_mean_node.py`:
-This script subscribes to both depth and RGB images from the camera. It then processes these images by splitting them into layers and drawing contours around objects detected in each layer. The purpose of this processing is to identify obstacles in the environment. Finally, the script implements avoidance maneuvers to navigate around any obstacles detected in its path.
+# Cpp Avoidance
+
+- `avoidance.cpp`: Main part of avoidance node. It computes all nessesary data to change UAV trajectory. It uses Potential Fields Method as a core for collision avoidance system.   
+
+- `mothernode.py`: Subscribes to avoidance messages to control drone path. It was seperated from `avoidance.cpp` due to testing with other systems.  
+
+- `octomap.cpp`: Allows to compute new waypoint for UAV. It takes octomap to find a new sub-waypoint.  
+
+- `path.cpp`: Subscribes to drone position and convert it to path. Used for Path visualization in Rviz.
+
   
-## Dependencies
+## System In Action
 
-- ROS
-- sensor_msgs
-- rospy
-- numpy
-- OpenCV
-- cv_bridge
-- imutils
+# Performance test in SITL
 
-## Usage
+Message potienital\_twist represents result of calculations for PFM. It shows how frequent the system is able to respond.
 
-1. Clone the repository.
-2. Navigate to the repository in your terminal.
-3. Run the `depth_object_node.py` script.
+| **Message**         | **Avg. value [Hz]** | **Min [s]** | **Max [s]** | **Std. Deviation [s]** |
+|---------------------|---------------------|-------------|-------------|------------------------|
+| potential\_twist    | 3.410               | 0.143       | 0.474       | 0.06600                |
+
+To represent how it works, there are few images obtained after testing. 
+
+# Rviz Visualization 
+
+![Path Visualization]{Images/pointcloudgazeborviz-after.png}
+
+# Path Visualization in QgroundControl
+
+![Path Visualization]{Images/pfa-qg-path.png}
+
+# Path Visualization in Rviz
+
+![Rviz Visualization of working system]{Images/pfa-rviz-path.png}
 
 ## Contributing
 

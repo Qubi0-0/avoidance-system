@@ -66,7 +66,7 @@ rosrun cpp_avoidance avoidance_node
 3. and in new terminal start `mother_node`, responisble for decision-making.
 
 ```bash
-rosrun cpp_avoidance mother_node
+rosrun cpp_avoidance mother_node.py
 ```
 
 

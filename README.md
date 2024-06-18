@@ -29,15 +29,15 @@ To represent how it works, there are few images obtained after testing.
 
 # Rviz Visualization 
 
-![Path Visualization]{Images/pointcloudgazeborviz-after.png}
+![!\[Path Visualization\]{Images/pointcloudgazeborviz-after.png}](https://github.com/Qubi0-0/avoidance-system/blob/main/Images/pfa-qg-path.png)
 
 # Path Visualization in QgroundControl
 
-![Path Visualization]{Images/pfa-qg-path.png}
+![!\[Path Visualization\]{Images/pfa-qg-path.png}](https://github.com/Qubi0-0/avoidance-system/blob/main/Images/pfa-qg-path.png)
 
 # Path Visualization in Rviz
 
-![Rviz Visualization of working system]{Images/pfa-rviz-path.png}
+![!\[Rviz Visualization of working system\]{Images/pfa-rviz-path.png}](https://github.com/Qubi0-0/avoidance-system/blob/main/Images/pfa-rviz-path.png)
 
 ## Contributing
 

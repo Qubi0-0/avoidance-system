@@ -3,6 +3,13 @@
 #include <pcl/filters/passthrough.h>
 
 
+"""
+Main part of Avoidance system. It uses Potential Fields Method to avoid obstacles on the way. 
+
+
+"""
+
+
 PosePointRPY::PosePointRPY(double x, double y, double z, double roll, double pitch, double yaw) : roll(roll), pitch(pitch), yaw(yaw) {
     pos.pose.position.x = x;
     pos.pose.position.y = y;
@@ -52,7 +59,6 @@ void Avoidance::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_ms
         cloud_downsampled->points.push_back(cloud->points[i]);
     }
 
-    // ROS_INFO("Amount of Points %lu", cloud_downsampled->points.size());
     pcl::PassThrough<pcl::PointXYZ> pass;
     pass.setInputCloud(cloud_downsampled);
     pass.setFilterFieldName("z");
@@ -70,6 +76,9 @@ void Avoidance::cloudCallback(const sensor_msgs::PointCloud2::ConstPtr& cloud_ms
         ROS_WARN("%s", ex.what());
         return;
     }
+
+
+    // Potentially may be used for using DBSCAN (IT doesnt work very well) 
 
     // pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>());
     // Perform any necessary filtering on the cloud
@@ -146,7 +155,6 @@ PointCloudPtr Avoidance::groupPoints(const PointCloudPtr& cloud) {
                 Eigen::Vector3d direction_vector = (drone_position_ - Eigen::Vector3d(obstacle.x, obstacle.y, obstacle.z)) / distance;
 
                 // Compute repulsive force using the inverse square law
-
                 repulsive_force += (K_REP / (distance * distance)) * direction_vector;
             }
         }
@@ -164,7 +172,7 @@ Eigen::Vector3d Avoidance::computeAttractiveForce() {
     }
 
 double Avoidance::computeHeightForce() {
-    double force_factor = 1.0;
+    double force_factor = 0.1;
     double height_difference = FLIGHT_ALT - local_pose_.pose.position.z;
     double z_force = height_difference * force_factor;
 
@@ -211,6 +219,7 @@ void Avoidance::potentialFieldsAvoidance() {
     }
 }
 
+"Publishes clusters to RVIZ"
 void Avoidance::publishClusters(const PointCloudPtr& clusters) {
     clusters->points.push_back(pcl::PointXYZ(target_position_[0],target_position_[1],target_position_[2]));
     visualization_msgs::MarkerArray marker_array;

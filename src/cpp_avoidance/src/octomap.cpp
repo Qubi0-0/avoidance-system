@@ -2,6 +2,14 @@
 #include "pcl_ros/transforms.h"
 #include <pcl/filters/passthrough.h>
 
+
+"""
+It used for generating new waypoints for A* algorythm with use of octomap
+
+
+"""
+
+
 geometry_msgs::Point AvoidanceOctomap::TARGET_POINT = geometry_msgs::Point();
 
 AvoidanceOctomap::AvoidanceOctomap(const ros::NodeHandle& nh)
@@ -10,7 +18,6 @@ AvoidanceOctomap::AvoidanceOctomap(const ros::NodeHandle& nh)
 
     pose_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("/mavros/local_position/pose", 1, &AvoidanceOctomap::positionCallback, this);
     octree_sub_ = nh_.subscribe<octomap_msgs::Octomap>("octomap_binary", 1, &AvoidanceOctomap::octreeCallback, this);
-
     goal_pub_ = nh_.advertise<geometry_msgs::PointStamped>("drone_tracking/goal", 1);
     TARGET_POINT.x = 0;
     TARGET_POINT.y = 90;
@@ -48,7 +55,10 @@ bool AvoidanceOctomap::has_reached_target(const geometry_msgs::Point& current_po
                            pow(target_point.z - current_position.z, 2));
     return distance < 0.1;
 }
+"""
+Generates new waypoint in octomap for A* algotirhm 
 
+"""
 geometry_msgs::Point AvoidanceOctomap::get_nearest_point_to_target(octomap::OcTree* octree, const geometry_msgs::Point& target_point) {
     const double DIST = 5.0; 
     const double OFFSET = 3.0;  // The offset to use when trying to find a point to the side

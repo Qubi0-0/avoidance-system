@@ -11,6 +11,13 @@ from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 M_PI = 3.14159265359
 
+"""
+This class is resposible for supervising whole operation. It takes move commands and control UAV 
+UAV can be controled both with Twist and PoseStamped messages
+
+"""
+
+
 class TakeOff:
     def __init__(self):
         self.pose = rospy.Subscriber(

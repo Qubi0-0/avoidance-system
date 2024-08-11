@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""
+Code responsible for showing UAV's path in Rviz. 
+
+"""
+
 
 import rospy
 from nav_msgs.msg import Path

@@ -6,8 +6,12 @@ from mavros_msgs.msg import State
 from mavros_msgs.srv import CommandBool, CommandBoolRequest, SetMode, SetModeRequest
 from tf import transformations
 
+"""
+Used for takeoff of the UAV
 
-START_ALT = 10 # alt for drone flight
+"""
+
+START_ALT = 10 # alt for drone takeoff
 M_PI = 3.14159265359
 TARGET_ANGL = 1 * (M_PI / 180.0)
 POS_TRESHOLD = 0.3
